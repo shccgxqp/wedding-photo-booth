@@ -4,15 +4,16 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Wedding Photo Booth</title>
+    <link rel="stylesheet" href="/src/app.css" />
   </head>
   <body>
     <main class="app-shell">
       <section class="top-bar" aria-label="Wedding photo booth">
         <div>
           <p class="eyebrow" id="tagline">Wedding Photo Booth</p>
-          <h1 id="coupleName">HAN &amp; YU</h1>
+          <h1 id="coupleName">jim &amp; camilla</h1>
         </div>
-        <div class="date-pill" id="weddingDate">2026.05.22</div>
+        <div class="date-pill" id="weddingDate">2026.11.07</div>
       </section>
 
       <section class="stage" id="layoutScreen">
@@ -38,7 +39,7 @@
             <h2 id="cameraTitle">準備拍攝</h2>
             <p class="status-text" id="cameraStatus">看鏡頭，倒數後會自動拍下。</p>
             <button class="primary-btn" id="captureBtn" type="button">開始拍攝</button>
-            <button class="ghost-btn" id="switchCameraBtn" type="button" aria-label="切換鏡頭">↺ 切換鏡頭</button>
+            <button class="ghost-btn" id="cameraBackBtn" type="button">回版型選擇</button>
           </aside>
         </div>
       </section>
@@ -74,6 +75,7 @@
     </main>
 
     <canvas id="workCanvas" class="hidden"></canvas>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

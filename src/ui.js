@@ -20,7 +20,7 @@ export const els = {
   cameraTitle: document.querySelector('#cameraTitle'),
   cameraStatus: document.querySelector('#cameraStatus'),
   thumbStrip: document.querySelector('#thumbStrip'),
-  switchCameraBtn: document.querySelector('#switchCameraBtn'),
+  cameraBackBtn: document.querySelector('#cameraBackBtn'),
   captureBtn: document.querySelector('#captureBtn'),
   resultImage: document.querySelector('#resultImage'),
   uploadStatus: document.querySelector('#uploadStatus'),
@@ -36,12 +36,13 @@ export function showScreen(screen) {
     s.classList.add('hidden')
   );
   screen.classList.remove('hidden');
+  document.body.style.overflow = screen === els.layoutScreen ? '' : 'hidden';
 }
 
 export function setBusy(isBusy) {
   state.busy = isBusy;
   els.captureBtn.disabled = isBusy;
-  els.switchCameraBtn.disabled = isBusy;
+  els.cameraBackBtn.disabled = isBusy;
 }
 
 export function applyConfig(config) {

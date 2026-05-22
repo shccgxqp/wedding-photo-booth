@@ -53,13 +53,16 @@ function updatePreviewRatio() {
   const targetRatio = rw / rh;
   const wrapRatio = wrapRect.width / wrapRect.height;
 
-  preview.style.aspectRatio = `${rw} / ${rh}`;
   if (wrapRatio > targetRatio) {
-    preview.style.height = '100%';
-    preview.style.width = 'auto';
+    const h = wrapRect.height;
+    const w = h * targetRatio;
+    preview.style.height = `${Math.floor(h)}px`;
+    preview.style.width = `${Math.floor(w)}px`;
   } else {
-    preview.style.width = '100%';
-    preview.style.height = 'auto';
+    const w = wrapRect.width;
+    const h = w / targetRatio;
+    preview.style.width = `${Math.floor(w)}px`;
+    preview.style.height = `${Math.floor(h)}px`;
   }
 }
 
@@ -151,6 +154,7 @@ function shootAgain() {
 async function boot() {
   renderLayoutCards(selectLayout);
 
+
   try {
     const response = await fetch('/api/config');
     if (response.ok) applyConfig(await response.json());
@@ -160,7 +164,7 @@ async function boot() {
 
   window.addEventListener('resize', updatePreviewRatio);
   els.captureBtn.addEventListener('click', handleCapture);
-  els.switchCameraBtn.addEventListener('click', switchCamera);
+  els.cameraBackBtn.addEventListener('click', backToLayouts);
   els.againBtn.addEventListener('click', shootAgain);
   els.resultBackBtn.addEventListener('click', backToLayouts);
 }

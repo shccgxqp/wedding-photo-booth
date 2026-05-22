@@ -33,8 +33,8 @@ export const layouts = {
 
 export const state = {
   config: {
-    coupleName: 'HAN & YU',
-    weddingDate: '2026.05.22',
+    coupleName: 'jim & camilla',
+    weddingDate: '2026.11.07',
     tagline: 'Wedding Photo Booth',
     countdownSeconds: 3,
     theme: { primary: '#f28ca8', secondary: '#fff4f7', ink: '#49333a' },
