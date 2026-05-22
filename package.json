@@ -1,0 +1,21 @@
+{
+  "name": "wedding-photo-booth",
+  "version": "1.0.0",
+  "description": "iPad wedding photo booth with server-side photo storage and QR downloads.",
+  "main": "server.cjs",
+  "scripts": {
+    "start": "node server.cjs",
+    "dev": "concurrently \"vite\" \"nodemon server.cjs\"",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "qrcode-generator": "^2.0.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4",
+    "concurrently": "^9",
+    "nodemon": "^3.1.14",
+    "tailwindcss": "^4",
+    "vite": "^6"
+  }
+}

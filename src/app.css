@@ -1,0 +1,541 @@
+@import "tailwindcss";
+
+@theme {
+  --color-pink: #f28ca8;
+  --color-rose: #b64f6b;
+  --color-cream: #fff8f3;
+  --color-blush: #fff0f5;
+  --color-ink: #49333a;
+  --color-muted: #8b6873;
+  --color-mint: #7fc8b8;
+  --color-gold: #d4a84f;
+  --font-serif: Georgia, "Times New Roman", serif;
+  --font-sans: "Avenir Next", "Noto Sans TC", "PingFang TC", sans-serif;
+}
+
+/* CSS vars for JS runtime theme override via applyConfig() */
+:root {
+  --pink: #f28ca8;
+  --blush: #fff0f5;
+  --ink: #49333a;
+  --rose: #b64f6b;
+  --muted: #8b6873;
+  --mint: #7fc8b8;
+  --line: rgba(73, 51, 58, 0.14);
+}
+
+* {
+  @apply box-border;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  @apply m-0 overflow-x-hidden;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(circle at 10% 12%, rgba(127, 200, 184, 0.28), transparent 24rem),
+    radial-gradient(circle at 82% 18%, rgba(242, 140, 168, 0.32), transparent 22rem),
+    linear-gradient(135deg, #fffaf6 0%, #fff0f5 48%, #eef9f6 100%);
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font: inherit;
+}
+
+/* ── Layout shell ── */
+
+.app-shell {
+  @apply min-h-screen grid gap-[18px];
+  grid-template-rows: auto 1fr;
+  padding:
+    max(22px, env(safe-area-inset-top))
+    max(22px, env(safe-area-inset-right))
+    max(22px, env(safe-area-inset-bottom))
+    max(22px, env(safe-area-inset-left));
+}
+
+.top-bar {
+  @apply flex items-center justify-between gap-[18px];
+}
+
+.eyebrow,
+.tiny-label {
+  @apply m-0 mb-[6px] text-[0.78rem] font-extrabold;
+  color: var(--rose);
+  letter-spacing: 0;
+}
+
+h1,
+h2,
+p {
+  @apply mt-0;
+}
+
+h1 {
+  @apply mb-0 font-bold leading-[0.94];
+  font-family: var(--font-serif);
+  font-size: clamp(2.2rem, 6vw, 5rem);
+}
+
+h2 {
+  @apply mb-[12px] leading-[0.98];
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 4.4vw, 4.2rem);
+}
+
+.date-pill {
+  @apply flex-none border px-[18px] py-[12px] rounded-full font-extrabold;
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 10px 30px rgba(182, 79, 107, 0.12);
+}
+
+/* ── Stage card ── */
+
+.stage {
+  @apply min-h-0 border rounded-[28px] overflow-hidden relative;
+  border-color: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 24px 70px rgba(145, 71, 95, 0.22);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.9), rgba(255, 248, 251, 0.76)),
+    repeating-linear-gradient(90deg, transparent 0 34px, rgba(242, 140, 168, 0.055) 34px 35px);
+}
+
+.stage::before {
+  content: "";
+  @apply absolute pointer-events-none;
+  inset: 18px;
+  border: 1px dashed rgba(182, 79, 107, 0.2);
+  border-radius: 20px;
+}
+
+/* ── Layout select screen ── */
+
+.intro-copy {
+  @apply relative z-[1];
+  padding: clamp(24px, 5vw, 58px) clamp(24px, 6vw, 72px) 10px;
+}
+
+.layout-grid {
+  @apply relative z-[1] grid grid-cols-3 gap-[18px];
+  padding: 10px clamp(18px, 6vw, 72px) clamp(22px, 5vw, 58px);
+}
+
+.layout-card {
+  @apply min-h-[360px] border rounded-[20px] cursor-pointer p-[18px] grid gap-[16px];
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: 0 18px 36px rgba(182, 79, 107, 0.13);
+  grid-template-rows: 1fr auto;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.layout-card:active,
+.layout-card:hover {
+  @apply -translate-y-1;
+  border-color: rgba(242, 140, 168, 0.55);
+  box-shadow: 0 24px 44px rgba(182, 79, 107, 0.2);
+}
+
+.layout-preview {
+  @apply min-h-[230px] rounded-[14px] grid gap-2 p-4;
+  border: 8px solid #fff;
+  outline: 1px solid rgba(182, 79, 107, 0.12);
+  background:
+    linear-gradient(135deg, rgba(255, 240, 245, 0.92), rgba(238, 249, 246, 0.9)),
+    #fff;
+}
+
+.preview-slot {
+  @apply rounded-[10px] border;
+  border-color: rgba(182, 79, 107, 0.16);
+  background:
+    linear-gradient(135deg, rgba(242, 140, 168, 0.18), rgba(127, 200, 184, 0.16)),
+    #fff;
+}
+
+.preview-strip {
+  @apply mx-auto;
+  width: min(48%, 160px);
+  grid-template-rows: repeat(4, 1fr);
+}
+
+.preview-grid {
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+}
+
+.preview-portrait {
+  @apply p-6;
+  grid-template-rows: 1fr;
+}
+
+.layout-copy h3 {
+  @apply m-0 mb-[6px] text-[1.35rem];
+}
+
+.layout-copy p {
+  @apply m-0 leading-[1.5];
+  color: var(--muted);
+}
+
+/* ── Camera & result panels ── */
+
+.camera-panel,
+.result-panel {
+  @apply relative z-[1] h-full grid gap-5;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+  padding: clamp(18px, 4vw, 38px);
+}
+
+.camera-preview-wrap {
+  @apply relative w-full flex justify-center items-center self-stretch;
+  min-height: 0;
+  max-height: 72vh;
+}
+
+.camera-preview {
+  @apply relative overflow-hidden rounded-[22px] shrink-0;
+  background: #251d20;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+  transition: width 0.2s, height 0.2s;
+}
+
+video {
+  @apply w-full h-full object-cover;
+  transform: scaleX(-1);
+}
+
+.countdown {
+  @apply absolute inset-0 grid place-items-center text-white;
+  font-family: var(--font-serif);
+  font-size: min(24vw, 13rem);
+  text-shadow: 0 12px 42px rgba(73, 51, 58, 0.5);
+  background: rgba(73, 51, 58, 0.12);
+}
+
+.shot-badge {
+  @apply absolute top-[18px] right-[18px] text-white font-extrabold rounded-full;
+  background: rgba(73, 51, 58, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  padding: 10px 14px;
+}
+
+.flash-overlay {
+  @apply absolute inset-0 pointer-events-none opacity-0;
+  background: #fff;
+}
+
+.flash-overlay.flashing {
+  animation: shutter-flash 0.45s ease-out forwards;
+}
+
+@keyframes shutter-flash {
+  0%   { opacity: 0.92; }
+  100% { opacity: 0; }
+}
+
+.side-panel,
+.download-panel {
+  @apply rounded-[22px] border flex flex-col gap-[14px] p-[22px];
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.status-text {
+  @apply mb-0 leading-[1.55];
+  color: var(--muted);
+}
+
+
+/* ── Buttons ── */
+
+.primary-btn,
+.soft-btn,
+.ghost-btn,
+.icon-btn,
+.download-link {
+  @apply min-h-[54px] rounded-full border-0 inline-flex items-center justify-center text-center no-underline cursor-pointer;
+  font-weight: 850;
+}
+
+.primary-btn {
+  @apply text-white;
+  background: linear-gradient(135deg, var(--rose), var(--pink));
+  box-shadow: 0 16px 30px rgba(182, 79, 107, 0.26);
+}
+
+.soft-btn,
+.download-link {
+  background: #fff;
+  border: 1px solid rgba(182, 79, 107, 0.18) !important;
+  color: var(--rose);
+}
+
+.ghost-btn,
+.icon-btn {
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid var(--line) !important;
+  color: var(--ink);
+}
+
+.icon-btn {
+  @apply text-2xl;
+}
+
+button:disabled {
+  @apply opacity-50 cursor-wait;
+}
+
+/* ── Loading screen ── */
+
+.loading-panel {
+  @apply relative z-[1] h-full flex flex-col items-center justify-center gap-[28px] p-[38px] text-center;
+}
+
+.loading-spinner {
+  width: 64px;
+  height: 64px;
+  border: 4px solid var(--line);
+  border-top-color: var(--pink);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-message {
+  @apply mb-0 leading-[1.6];
+  color: var(--muted);
+  font-size: 1.1rem;
+  transition: opacity 0.3s ease;
+}
+
+/* ── Result screen ── */
+
+.result-photo-wrap {
+  @apply min-h-[520px] grid place-items-center rounded-[22px] overflow-hidden;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.52), rgba(255, 240, 245, 0.72)),
+    repeating-linear-gradient(45deg, rgba(73, 51, 58, 0.045) 0 1px, transparent 1px 14px);
+}
+
+#resultImage {
+  @apply rounded-[14px];
+  max-width: min(100%, 520px);
+  max-height: 72vh;
+  box-shadow: 0 26px 60px rgba(73, 51, 58, 0.2);
+}
+
+.download-info {
+  @apply flex flex-col gap-[14px];
+}
+
+.download-info-text {
+  @apply flex flex-col gap-[6px];
+}
+
+.qr-canvas {
+  @apply rounded-[20px] border self-center p-3;
+  width: min(100%, 240px);
+  height: auto;
+  border-color: var(--line);
+  background: #fff;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ══════════════════════════════════════════
+   Responsive
+══════════════════════════════════════════ */
+
+/* Tablet / iPad portrait (600–860 px) */
+@media (max-width: 860px) {
+  .app-shell {
+    @apply p-[14px] gap-[14px];
+  }
+
+  .top-bar {
+    @apply items-start;
+  }
+
+  .layout-grid {
+    @apply grid-cols-2;
+  }
+
+  .camera-panel,
+  .result-panel {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+    @apply gap-[14px] p-[18px];
+  }
+
+  .layout-card {
+    @apply min-h-[260px];
+  }
+
+  .result-photo-wrap {
+    @apply min-h-[360px];
+  }
+
+  h1 {
+    @apply text-[2.35rem];
+  }
+
+  h2 {
+    @apply text-[2.1rem];
+  }
+}
+
+/* Mobile phone portrait (≤ 599 px) */
+@media (max-width: 599px) {
+  .app-shell {
+    gap: 10px;
+    padding:
+      max(12px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
+  }
+
+  h1 {
+    @apply text-[1.9rem];
+  }
+
+  h2 {
+    @apply text-[1.6rem] mb-[6px];
+  }
+
+  .date-pill {
+    @apply px-[12px] py-[8px] text-[0.82rem];
+  }
+
+  /* Layout screen: horizontal cards */
+  .intro-copy {
+    @apply p-[16px] pb-[6px];
+  }
+
+  .layout-grid {
+    @apply grid-cols-1 gap-[10px];
+    padding: 8px 14px 16px;
+  }
+
+  .layout-card {
+    @apply min-h-0 items-center gap-[14px];
+    grid-template-rows: unset;
+    grid-template-columns: 80px 1fr;
+    padding: 12px 16px;
+  }
+
+  .layout-preview {
+    @apply min-h-0 p-[8px];
+    width: 80px;
+    height: 80px;
+    border-width: 4px;
+  }
+
+  /* Camera screen: stacked */
+  .camera-panel {
+    @apply flex flex-col h-full p-[12px] gap-[10px];
+    align-items: flex-start;
+  }
+
+  .camera-preview-wrap {
+    @apply w-full flex-none;
+    max-height: 52vh;
+    align-self: center;
+  }
+
+  .camera-preview {
+    max-height: none;
+  }
+
+  .side-panel {
+    @apply flex-none p-[14px_16px] gap-[8px] rounded-[18px];
+    width: 100%;
+  }
+
+  #cameraTitle {
+    @apply text-[1.3rem];
+  }
+
+  .thumb-strip {
+    @apply min-h-[52px];
+  }
+
+  /* Result screen: stacked */
+  .result-panel {
+    @apply flex flex-col h-full p-[12px] gap-[10px];
+  }
+
+  .result-photo-wrap {
+    flex: 1;
+    @apply min-h-[160px];
+    max-height: 52vh;
+  }
+
+  #resultImage {
+    max-height: 50vh;
+  }
+
+  .download-panel {
+    @apply flex-none p-[12px_14px] gap-[10px] rounded-[18px];
+  }
+
+  .download-info {
+    @apply flex-row items-start gap-[12px];
+  }
+
+  .download-info-text {
+    @apply flex-1 gap-[4px];
+  }
+
+  .download-info-text h2 {
+    @apply text-[1.25rem] mb-0;
+  }
+
+  .qr-canvas {
+    width: 96px;
+    flex-shrink: 0;
+    padding: 6px;
+  }
+
+  .primary-btn,
+  .soft-btn,
+  .ghost-btn,
+  .icon-btn,
+  .download-link {
+    @apply min-h-[48px];
+  }
+}
+
+/* Landscape on small phones */
+@media (max-height: 480px) {
+  .camera-preview-wrap,
+  .result-photo-wrap {
+    min-height: 160px;
+  }
+
+  .layout-card {
+    min-height: 0;
+  }
+
+  .side-panel,
+  .download-panel {
+    @apply gap-[6px];
+    padding: 10px 14px;
+  }
+}

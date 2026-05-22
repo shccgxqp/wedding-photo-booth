@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.claude/
+uploads/*.png
+uploads/*.jpg
+uploads/*.jpeg
+uploads/*.webp
+.env
