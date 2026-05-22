@@ -26,7 +26,7 @@ During dev, the frontend runs on port **5173** (Vite with HMR). API calls to `/a
 | [src/main.js](src/main.js) | Entry point, boot, event binding, orchestrates cross-module flows |
 | [src/state.js](src/state.js) | Shared mutable `state` object and `layouts` config |
 | [src/ui.js](src/ui.js) | DOM element refs (`els`), screen switching, config apply, shot UI |
-| [src/camera.js](src/camera.js) | `getUserMedia`, countdown, `captureFrame`, camera switch |
+| [src/camera.js](src/camera.js) | `getUserMedia`, countdown, `captureFrame` |
 | [src/compose.js](src/compose.js) | Canvas composition — draws background, photos, title |
 | [src/upload.js](src/upload.js) | `POST /api/photos`, QR code render via `qrcode-generator` |
 | [src/app.css](src/app.css) | Tailwind v4 + custom CSS (gradients, pseudo-elements, safe-area) |
@@ -42,12 +42,14 @@ During dev, the frontend runs on port **5173** (Vite with HMR). API calls to `/a
 4. Server saves PNG to `uploads/`, returns `{ id, filename, downloadUrl }`
 5. QR code rendered client-side via `qrcode-generator` (ES module import, bundled by Vite)
 
-**Layouts:**
-| id | shots | output size |
-|----|-------|-------------|
-| `strip` | 4 | 1200×3600 |
-| `grid` | 4 | 2200×2200 |
-| `portrait` | 1 | 1600×2200 |
+**Layouts:** (defined in `src/state.js`)
+| id | shots | output size | shotRatio |
+|----|-------|-------------|-----------|
+| `strip` | 4 | 720×2160 | 3/4 |
+| `grid` | 4 | 900×1400 | 3/4 |
+| `portrait` | 1 | 1080×1440 | 780/920 |
+
+**Camera preview ratio:** `.camera-preview-wrap` + `.camera-preview` use JS `updatePreviewRatio()` in `main.js` to set exact px dimensions. `<video>` is `position:absolute` to prevent Safari from stretching the container. Called via double `requestAnimationFrame` after layout select and on window resize.
 
 **Camera:** requires HTTPS in production (Safari/iPad). `http://localhost:5173` works for desktop dev.
 
@@ -68,6 +70,15 @@ Uses **Tailwind v4** via `@tailwindcss/vite` plugin. No `tailwind.config.js` nee
 | 600–860px | Tablet/iPad portrait: 2-col layout select, narrower side panel |
 | ≤ 599px | Phone: horizontal layout cards, stacked camera/result (flex column) |
 | max-height ≤ 480px | Landscape phone: reduced min-heights |
+
+## Wedding config
+
+Edit `config/wedding.json` (hot-reloadable, no restart needed):
+- `coupleName`: currently `"jim & camilla"`
+- `weddingDate`: currently `"2026.11.07"`
+- `tagline`: currently `"Wedding Photo Booth"`
+- `publicBaseUrl`: set to HTTPS domain for QR code URLs
+- `theme.primary/secondary/ink`: CSS color overrides
 
 ## Production checklist
 
