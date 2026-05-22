@@ -1,5 +1,5 @@
 import './app.css';
-import { state, layouts } from './state.js';
+import { state, layouts, filters } from './state.js';
 
 const LOADING_MESSAGES = [
   '吃飽沒？新郎關心您',
@@ -37,7 +37,7 @@ function stopMessageCycle() {
   clearInterval(_msgTimer);
   _msgTimer = null;
 }
-import { els, showScreen, setBusy, applyConfig, renderLayoutCards, updateShotUi } from './ui.js';
+import { els, showScreen, setBusy, applyConfig, renderLayoutCards, renderFrameCards, renderFilterBar, updateShotUi } from './ui.js';
 import { startCamera, stopCamera, runCountdown, captureFrame, switchCamera, triggerFlash, wait } from './camera.js';
 import { composePhoto } from './compose.js';
 import { uploadPhoto, renderQrCode, clearQr } from './upload.js';
@@ -66,16 +66,33 @@ function updatePreviewRatio() {
   }
 }
 
-async function selectLayout(layoutId) {
+function selectLayout(layoutId) {
   state.activeLayout = layouts[layoutId];
   state.shots = [];
+  state.activeFrame = 'none';
+  state.activeFilter = 'none';
+  showScreen(els.frameScreen);
+  renderFrameCards(state.activeFrame, selectFrame);
+}
+
+async function selectFrame(frameId) {
+  state.activeFrame = frameId;
+  renderFrameCards(frameId, selectFrame);
   els.activeLayoutLabel.textContent = state.activeLayout.name;
   els.cameraTitle.textContent = '準備拍攝';
   els.cameraStatus.textContent = '看鏡頭，倒數後會自動拍下。';
   updateShotUi();
+  renderFilterBar(state.activeFilter, selectFilter);
   showScreen(els.cameraScreen);
   requestAnimationFrame(() => requestAnimationFrame(updatePreviewRatio));
   await startCamera();
+}
+
+function selectFilter(filterId) {
+  state.activeFilter = filterId;
+  const filterObj = filters.find((f) => f.id === filterId);
+  els.video.style.filter = filterObj && filterObj.filter !== 'none' ? filterObj.filter : '';
+  renderFilterBar(filterId, selectFilter);
 }
 
 async function handleCapture() {
@@ -139,9 +156,17 @@ async function finishPhoto() {
 function backToLayouts() {
   stopCamera();
   state.shots = [];
+  state.activeFrame = 'none';
+  state.activeFilter = 'none';
   updateShotUi();
   showScreen(els.layoutScreen);
 }
+
+function backToFrames() {
+  showScreen(els.frameScreen);
+  renderFrameCards(state.activeFrame, selectFrame);
+}
+
 
 function shootAgain() {
   state.shots = [];
@@ -164,9 +189,10 @@ async function boot() {
 
   window.addEventListener('resize', updatePreviewRatio);
   els.captureBtn.addEventListener('click', handleCapture);
-  els.cameraBackBtn.addEventListener('click', backToLayouts);
+  els.cameraBackBtn.addEventListener('click', backToFrames);
   els.againBtn.addEventListener('click', shootAgain);
   els.resultBackBtn.addEventListener('click', backToLayouts);
+  els.frameBackBtn.addEventListener('click', backToLayouts);
 }
 
 boot();

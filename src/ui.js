@@ -1,10 +1,14 @@
-import { state, layouts } from './state.js';
+import { state, layouts, frames, filters } from './state.js';
 
 export const els = {
   tagline: document.querySelector('#tagline'),
   coupleName: document.querySelector('#coupleName'),
   weddingDate: document.querySelector('#weddingDate'),
   layoutScreen: document.querySelector('#layoutScreen'),
+  frameScreen:  document.querySelector('#frameScreen'),
+  frameCards:   document.querySelector('#frameCards'),
+  frameBackBtn: document.querySelector('#frameBackBtn'),
+  filterBar:    document.querySelector('#filterBar'),
   cameraScreen: document.querySelector('#cameraScreen'),
   loadingScreen: document.querySelector('#loadingScreen'),
   loadingMessage: document.querySelector('#loadingMessage'),
@@ -32,11 +36,16 @@ export const els = {
 };
 
 export function showScreen(screen) {
-  [els.layoutScreen, els.cameraScreen, els.loadingScreen, els.resultScreen].forEach((s) =>
-    s.classList.add('hidden')
-  );
+  [
+    els.layoutScreen,
+    els.frameScreen,
+    els.cameraScreen,
+    els.loadingScreen,
+    els.resultScreen,
+  ].forEach((s) => s.classList.add('hidden'));
   screen.classList.remove('hidden');
-  document.body.style.overflow = screen === els.layoutScreen ? '' : 'hidden';
+  document.body.style.overflow =
+    screen === els.layoutScreen || screen === els.frameScreen ? '' : 'hidden';
 }
 
 export function setBusy(isBusy) {
@@ -76,6 +85,34 @@ export function renderLayoutCards(onSelect) {
     `;
     card.addEventListener('click', () => onSelect(layout.id));
     els.layoutGrid.appendChild(card);
+  });
+}
+
+export function renderFrameCards(activeId, onSelect) {
+  els.frameCards.innerHTML = '';
+  frames.forEach((frame) => {
+    const card = document.createElement('button');
+    card.className = 'frame-card' + (frame.id === activeId ? ' selected' : '');
+    card.type = 'button';
+    card.innerHTML = `
+      <div class="frame-preview frame-preview--${frame.id}">
+        <div class="frame-preview__photo"></div>
+      </div>
+    `;
+    card.addEventListener('click', () => onSelect(frame.id));
+    els.frameCards.appendChild(card);
+  });
+}
+
+export function renderFilterBar(activeId, onSelect) {
+  els.filterBar.innerHTML = '';
+  filters.forEach((filter) => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-pill' + (filter.id === activeId ? ' active' : '');
+    btn.type = 'button';
+    btn.textContent = filter.name;
+    btn.addEventListener('click', () => onSelect(filter.id));
+    els.filterBar.appendChild(btn);
   });
 }
 

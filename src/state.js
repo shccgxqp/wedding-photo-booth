@@ -31,6 +31,21 @@ export const layouts = {
   },
 };
 
+export const frames = [
+  { id: 'none',    name: '無框' },
+  { id: 'classic', name: '白框加強' },
+  { id: 'gold',    name: '金框' },
+  { id: 'film',    name: '底片框' },
+];
+
+export const filters = [
+  { id: 'none',    name: '原色',  filter: 'none' },
+  { id: 'bw',      name: '黑白',  filter: 'grayscale(100%)' },
+  { id: 'warm',    name: '暖調',  filter: 'sepia(40%) saturate(140%)' },
+  { id: 'cool',    name: '冷調',  filter: 'hue-rotate(190deg) saturate(90%)' },
+  { id: 'vintage', name: '復古',  filter: 'sepia(60%) contrast(90%) brightness(90%)' },
+];
+
 export const state = {
   config: {
     coupleName: 'jim & camilla',
@@ -40,6 +55,8 @@ export const state = {
     theme: { primary: '#f28ca8', secondary: '#fff4f7', ink: '#49333a' },
   },
   activeLayout: layouts.strip,
+  activeFrame: 'none',
+  activeFilter: 'none',
   shots: [],
   stream: null,
   facingMode: 'user',

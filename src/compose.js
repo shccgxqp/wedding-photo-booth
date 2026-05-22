@@ -22,12 +22,60 @@ function drawCoverImage(ctx, source, x, y, width, height) {
 
 function drawPhoto(ctx, image, x, y, width, height) {
   const border = Math.round(Math.min(width, height) * 0.038);
-
   drawCoverImage(ctx, image, x, y, width, height);
-
   ctx.lineWidth = border;
   ctx.strokeStyle = '#ffffff';
   ctx.strokeRect(x, y, width, height);
+}
+
+function drawFrame(ctx, canvasWidth, canvasHeight, frameId) {
+  if (frameId === 'none' || frameId === 'classic') return;
+
+  const s = canvasWidth / 1200;
+
+  if (frameId === 'gold') {
+    const inset = Math.round(18 * s);
+    const cornerLen = Math.round(60 * s);
+    ctx.strokeStyle = '#d4af37';
+    ctx.lineWidth = Math.round(12 * s);
+    ctx.strokeRect(inset, inset, canvasWidth - inset * 2, canvasHeight - inset * 2);
+
+    ctx.lineWidth = Math.round(6 * s);
+    const corners = [
+      [inset, inset],
+      [canvasWidth - inset, inset],
+      [canvasWidth - inset, canvasHeight - inset],
+      [inset, canvasHeight - inset],
+    ];
+    corners.forEach(([cx, cy], i) => {
+      const dx = i === 0 || i === 3 ? cornerLen : -cornerLen;
+      const dy = i === 0 || i === 1 ? cornerLen : -cornerLen;
+      ctx.beginPath();
+      ctx.moveTo(cx + dx, cy);
+      ctx.lineTo(cx, cy);
+      ctx.lineTo(cx, cy + dy);
+      ctx.stroke();
+    });
+  }
+
+  if (frameId === 'film') {
+    const borderW = Math.round(60 * s);
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, borderW, canvasHeight);
+    ctx.fillRect(canvasWidth - borderW, 0, borderW, canvasHeight);
+
+    const holeR = Math.round(10 * s);
+    const holeSpacing = Math.round(60 * s);
+    ctx.fillStyle = '#333333';
+    for (let y = holeSpacing; y < canvasHeight; y += holeSpacing) {
+      ctx.beginPath();
+      ctx.arc(borderW / 2, y, holeR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(canvasWidth - borderW / 2, y, holeR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 }
 
 function drawBackground(ctx, width, height) {
@@ -114,5 +162,6 @@ export async function composePhoto() {
   }
 
   drawTitle(ctx, canvas, layout.name);
+  drawFrame(ctx, canvas.width, canvas.height, state.activeFrame);
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.88));
 }
