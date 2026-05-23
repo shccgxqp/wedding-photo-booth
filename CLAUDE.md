@@ -122,6 +122,27 @@ Edit `config/wedding.json` (hot-reloadable):
 - `publicBaseUrl`: set to HTTPS domain for QR code URLs
 - `theme.primary/secondary/ink`: CSS color overrides
 
+## Testing (webapp-testing skill)
+
+Playwright-based tests live in `scripts/`. Run after every significant change:
+
+```bash
+python scripts/with_server.py --server "npm run dev" --port 5173 -- python scripts/test_webapp.py
+```
+
+**Prerequisites (one-time):**
+```bash
+pip install playwright
+python -m playwright install chromium
+```
+
+`scripts/with_server.py` — starts dev server, waits for port 5173, runs the test command, kills server on exit.  
+`scripts/test_webapp.py` — 12 Playwright tests: layout screen, frame selection, frame01 skip-to-camera, heart guide SVG, shot badge, filter bar, back navigation.
+
+**Rule: run tests before reporting a task complete. If tests fail, fix before committing.**
+
+Adding tests for a new layout: add a `check()` block in `test_webapp.py` verifying the layout card appears, navigates to the right screen, and shows correct shot badge count.
+
 ## Production checklist
 
 - Run `npm run build` before `npm start`
