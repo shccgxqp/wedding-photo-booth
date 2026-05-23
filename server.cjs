@@ -12,21 +12,56 @@ const configPath = path.join(rootDir, "config", "wedding.json");
 
 fs.mkdirSync(uploadsDir, { recursive: true });
 
-const tokenMapPath = path.join(uploadsDir, "token-map.json");
-
-function loadTokenMap() {
+// Load .env without external dependencies
+function loadEnv() {
   try {
-    return JSON.parse(fs.readFileSync(tokenMapPath, "utf8"));
+    const lines = fs.readFileSync(path.join(rootDir, ".env"), "utf8").split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eq = trimmed.indexOf("=");
+      if (eq < 0) continue;
+      const key = trimmed.slice(0, eq).trim();
+      let val = trimmed.slice(eq + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (key && !(key in process.env)) process.env[key] = val;
+    }
+  } catch {}
+}
+loadEnv();
+
+const UPLOAD_SECRET = process.env.UPLOAD_SECRET || "";
+if (!UPLOAD_SECRET) console.warn("[security] UPLOAD_SECRET not set — photo URLs are insecure");
+
+// Derive 32-byte AES key from UPLOAD_SECRET
+const CIPHER_KEY = crypto.createHash("sha256").update(UPLOAD_SECRET || "insecure-default").digest();
+
+// Encrypt filename → URL-safe token (AES-256-GCM, random IV each call)
+function encryptFilename(filename) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", CIPHER_KEY, iv);
+  const encrypted = Buffer.concat([cipher.update(filename, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([iv, tag, encrypted]).toString("base64url");
+}
+
+// Decrypt token → filename; returns null if invalid/tampered
+function decryptToken(token) {
+  try {
+    const buf = Buffer.from(token, "base64url");
+    if (buf.length < 29) return null;
+    const iv = buf.subarray(0, 12);
+    const tag = buf.subarray(12, 28);
+    const encrypted = buf.subarray(28);
+    const decipher = crypto.createDecipheriv("aes-256-gcm", CIPHER_KEY, iv);
+    decipher.setAuthTag(tag);
+    return decipher.update(encrypted) + decipher.final("utf8");
   } catch {
-    return {};
+    return null;
   }
 }
-
-function saveTokenMap(map) {
-  fs.writeFileSync(tokenMapPath, JSON.stringify(map), "utf8");
-}
-
-const tokenMap = loadTokenMap();
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -161,9 +196,7 @@ async function handlePhotoUpload(req, res) {
   const filename = `${date}_${safeLayoutName(layout)}_${timestamp}_${random}.${ext}`;
   fs.writeFileSync(path.join(uploadsDir, filename), buffer);
 
-  const token = crypto.randomBytes(12).toString("hex");
-  tokenMap[token] = filename;
-  saveTokenMap(tokenMap);
+  const token = encryptFilename(filename);
 
   sendJson(res, 201, {
     id: path.parse(filename).name,
@@ -171,23 +204,6 @@ async function handlePhotoUpload(req, res) {
     token,
     downloadUrl: `${getOrigin(req)}/photos/${token}`
   });
-}
-
-function handlePhotoList(_req, res) {
-  sendText(res, 404, "Not found.");
-}
-
-function handleBackgroundList(req, res) {
-  fs.mkdirSync(backgroundsDir, { recursive: true });
-  const files = fs
-    .readdirSync(backgroundsDir)
-    .filter((f) => /\.(png|jpe?g|webp)$/i.test(f))
-    .sort();
-  const backgrounds = files.map((filename) => ({
-    filename,
-    url: `/backgrounds/${encodeURIComponent(filename)}`,
-  }));
-  sendJson(res, 200, { backgrounds });
 }
 
 function route(req, res) {
@@ -212,12 +228,21 @@ function route(req, res) {
   }
 
   if (req.method === "GET" && pathname === "/api/photos") {
-    handlePhotoList(req, res);
+    sendText(res, 404, "Not found.");
     return;
   }
 
   if (req.method === "GET" && pathname === "/api/backgrounds") {
-    handleBackgroundList(req, res);
+    fs.mkdirSync(backgroundsDir, { recursive: true });
+    const files = fs
+      .readdirSync(backgroundsDir)
+      .filter((f) => /\.(png|jpe?g|webp)$/i.test(f))
+      .sort();
+    const backgrounds = files.map((f) => ({
+      filename: f,
+      url: `/backgrounds/${encodeURIComponent(f)}`,
+    }));
+    sendJson(res, 200, { backgrounds });
     return;
   }
 
@@ -233,15 +258,14 @@ function route(req, res) {
   }
 
   if (req.method === "GET" && pathname.startsWith("/photos/")) {
-    const token = path.basename(decodeURIComponent(pathname.replace("/photos/", "")));
-    const filename = tokenMap[token];
+    const rawToken = decodeURIComponent(pathname.replace("/photos/", ""));
+    const filename = decryptToken(rawToken);
     if (!filename) {
       sendText(res, 404, "Not found.");
       return;
     }
-    serveFile(res, path.join(uploadsDir, filename), {
-      disposition: `inline; filename="${filename}"`
-    });
+    const filePath = path.join(uploadsDir, path.basename(filename));
+    serveFile(res, filePath, { disposition: `inline; filename="${path.basename(filename)}"` });
     return;
   }
 
