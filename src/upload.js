@@ -9,8 +9,8 @@ export async function uploadPhoto(blob, layoutId) {
   });
   if (!response.ok) throw new Error(`Upload failed: ${response.status}`);
   const data = await response.json();
-  // Build URL from browser origin so QR works on any device (server may see localhost)
-  data.downloadUrl = `${window.location.origin}/photos/${encodeURIComponent(data.filename)}`;
+  // Use token-based URL so guests can only access photos they know the link to
+  data.downloadUrl = `${window.location.origin}/photos/${data.token}`;
   return data;
 }
 

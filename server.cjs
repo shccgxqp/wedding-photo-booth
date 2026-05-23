@@ -12,6 +12,22 @@ const configPath = path.join(rootDir, "config", "wedding.json");
 
 fs.mkdirSync(uploadsDir, { recursive: true });
 
+const tokenMapPath = path.join(uploadsDir, "token-map.json");
+
+function loadTokenMap() {
+  try {
+    return JSON.parse(fs.readFileSync(tokenMapPath, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function saveTokenMap(map) {
+  fs.writeFileSync(tokenMapPath, JSON.stringify(map), "utf8");
+}
+
+const tokenMap = loadTokenMap();
+
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -145,20 +161,20 @@ async function handlePhotoUpload(req, res) {
   const filename = `${date}_${safeLayoutName(layout)}_${timestamp}_${random}.${ext}`;
   fs.writeFileSync(path.join(uploadsDir, filename), buffer);
 
+  const token = crypto.randomBytes(12).toString("hex");
+  tokenMap[token] = filename;
+  saveTokenMap(tokenMap);
+
   sendJson(res, 201, {
     id: path.parse(filename).name,
     filename,
-    downloadUrl: `${getOrigin(req)}/photos/${encodeURIComponent(filename)}`
+    token,
+    downloadUrl: `${getOrigin(req)}/photos/${token}`
   });
 }
 
 function handlePhotoList(_req, res) {
-  const photos = fs
-    .readdirSync(uploadsDir)
-    .filter((file) => /\.(png|jpe?g|webp)$/i.test(file))
-    .sort()
-    .reverse();
-  sendJson(res, 200, { photos });
+  sendText(res, 404, "Not found.");
 }
 
 function handleBackgroundList(req, res) {
@@ -217,7 +233,12 @@ function route(req, res) {
   }
 
   if (req.method === "GET" && pathname.startsWith("/photos/")) {
-    const filename = path.basename(decodeURIComponent(pathname.replace("/photos/", "")));
+    const token = path.basename(decodeURIComponent(pathname.replace("/photos/", "")));
+    const filename = tokenMap[token];
+    if (!filename) {
+      sendText(res, 404, "Not found.");
+      return;
+    }
     serveFile(res, path.join(uploadsDir, filename), {
       disposition: `inline; filename="${filename}"`
     });
