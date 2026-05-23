@@ -1,5 +1,4 @@
-import { state } from './state.js';
-import { els } from './ui.js';
+import { OVERLAY_URL, ZONES, TEXT_Y } from './frames/frame01.js';
 
 function drawCoverImage(ctx, source, x, y, width, height) {
   const srcW = source.videoWidth || source.naturalWidth || source.width;
@@ -18,7 +17,6 @@ function drawCoverImage(ctx, source, x, y, width, height) {
 
   ctx.drawImage(source, sx, sy, sw, sh, x, y, width, height);
 }
-
 
 function drawPhoto(ctx, image, x, y, width, height) {
   const border = Math.round(Math.min(width, height) * 0.038);
@@ -78,7 +76,13 @@ function drawFrame(ctx, canvasWidth, canvasHeight, frameId) {
   }
 }
 
-function drawBackground(ctx, width, height) {
+async function drawBackground(ctx, width, height, backgroundUrl) {
+  if (backgroundUrl) {
+    const img = await loadImage(backgroundUrl);
+    drawCoverImage(ctx, img, 0, 0, width, height);
+    return;
+  }
+
   const s = width / 1200;
   const gradient = ctx.createLinearGradient(0, 0, width, height);
   gradient.addColorStop(0, '#fff9f5');
@@ -102,18 +106,18 @@ function drawBackground(ctx, width, height) {
   }
 }
 
-function drawTitle(ctx, canvas, layoutName) {
+function drawTitle(ctx, canvas, layoutName, config) {
   const s = canvas.width / 1200;
   ctx.textAlign = 'center';
-  ctx.fillStyle = state.config.theme?.ink || '#49333a';
+  ctx.fillStyle = config.theme?.ink || '#49333a';
   ctx.font = `700 ${Math.round(82 * s)}px Georgia, serif`;
-  ctx.fillText(state.config.coupleName, canvas.width / 2, canvas.height - Math.round(190 * s));
+  ctx.fillText(config.coupleName, canvas.width / 2, canvas.height - Math.round(190 * s));
   ctx.font = `600 ${Math.round(36 * s)}px Avenir Next, sans-serif`;
   ctx.fillStyle = '#b64f6b';
-  ctx.fillText(`${state.config.weddingDate} · ${layoutName}`, canvas.width / 2, canvas.height - Math.round(125 * s));
+  ctx.fillText(`${config.weddingDate} · ${layoutName}`, canvas.width / 2, canvas.height - Math.round(125 * s));
   ctx.font = `500 ${Math.round(30 * s)}px Avenir Next, sans-serif`;
   ctx.fillStyle = 'rgba(73, 51, 58, 0.72)';
-  ctx.fillText(state.config.tagline, canvas.width / 2, canvas.height - Math.round(78 * s));
+  ctx.fillText(config.tagline, canvas.width / 2, canvas.height - Math.round(78 * s));
 }
 
 async function loadImage(dataUrl) {
@@ -124,20 +128,41 @@ async function loadImage(dataUrl) {
   return img;
 }
 
-export async function composePhoto() {
-  const layout = state.activeLayout;
-  const canvas = els.workCanvas;
-  canvas.width = layout.width;
-  canvas.height = layout.height;
-  const ctx = canvas.getContext('2d');
-  const images = await Promise.all(state.shots.map(loadImage));
+async function composeFrame01(ctx, canvas, images, config) {
+  ZONES.forEach((zone, i) => {
+    if (!images[i]) return;
+    drawCoverImage(ctx, images[i], zone.x, zone.y, zone.w, zone.h);
+  });
 
-  drawBackground(ctx, canvas.width, canvas.height);
+  const overlay = await loadImage(OVERLAY_URL);
+  ctx.drawImage(overlay, 0, 0, canvas.width, canvas.height);
+
+  const s = canvas.width / 784;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.font = `400 italic ${Math.round(22 * s)}px Georgia, serif`;
+  ctx.fillText(config.coupleName + '  ·  ' + config.weddingDate, canvas.width / 2, Math.round(TEXT_Y * s));
+  ctx.textBaseline = 'alphabetic';
+}
+
+export async function composePhoto(workCanvas, layout, shots, activeFrame, config, backgroundUrl) {
+  workCanvas.width = layout.width;
+  workCanvas.height = layout.height;
+  const ctx = workCanvas.getContext('2d');
+  const images = await Promise.all(shots.map(loadImage));
+
+  if (layout.id === 'frame01') {
+    await composeFrame01(ctx, workCanvas, images, config);
+    return new Promise((resolve) => workCanvas.toBlob(resolve, 'image/jpeg', 0.92));
+  }
+
+  await drawBackground(ctx, workCanvas.width, workCanvas.height, backgroundUrl);
 
   if (layout.id === 'strip') {
     const margin = 105, gap = 48, footer = 300;
-    const photoWidth = canvas.width - margin * 2;
-    const photoHeight = (canvas.height - margin * 2 - footer - gap * 3) / 4;
+    const photoWidth = workCanvas.width - margin * 2;
+    const photoHeight = (workCanvas.height - margin * 2 - footer - gap * 3) / 4;
     images.forEach((image, index) => {
       drawPhoto(ctx, image, margin, margin + index * (photoHeight + gap), photoWidth, photoHeight);
     });
@@ -145,7 +170,7 @@ export async function composePhoto() {
 
   if (layout.id === 'grid') {
     const margin = 40, gap = 16;
-    const photoW = Math.floor((canvas.width - margin * 2 - gap) / 2);
+    const photoW = Math.floor((workCanvas.width - margin * 2 - gap) / 2);
     const photoH = Math.round(photoW * 4 / 3);
     images.forEach((image, index) => {
       const col = index % 2;
@@ -154,14 +179,14 @@ export async function composePhoto() {
     });
     const photosBottom = margin + photoH * 2 + gap;
     ctx.fillStyle = 'rgba(127, 200, 184, 0.22)';
-    ctx.fillRect(margin, photosBottom + 28, canvas.width - margin * 2, 3);
+    ctx.fillRect(margin, photosBottom + 28, workCanvas.width - margin * 2, 3);
   }
 
   if (layout.id === 'portrait') {
-    drawPhoto(ctx, images[0], 150, 150, canvas.width - 300, canvas.height - 520);
+    drawPhoto(ctx, images[0], 150, 150, workCanvas.width - 300, workCanvas.height - 520);
   }
 
-  drawTitle(ctx, canvas, layout.name);
-  drawFrame(ctx, canvas.width, canvas.height, state.activeFrame);
-  return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.88));
+  drawTitle(ctx, workCanvas, layout.name, config);
+  drawFrame(ctx, workCanvas.width, workCanvas.height, activeFrame);
+  return new Promise((resolve) => workCanvas.toBlob(resolve, 'image/jpeg', 0.88));
 }

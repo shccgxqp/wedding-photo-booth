@@ -29,6 +29,18 @@ export const layouts = {
     height: 1440,
     shotRatio: '780/920',
   },
+  frame01: {
+    id: 'frame01',
+    name: '愛心拍貼',
+    description: '六格愛心版型，浪漫紅底花邊框，適合情侶賓客。',
+    requiredShots: 6,
+    previewClass: 'preview-frame01',
+    width: 784,
+    height: 1176,
+    shotRatio: '315/332',
+    skipFrameSelect: true,
+    showHeartGuide: true,
+  },
 };
 
 export const frames = [
@@ -46,20 +58,10 @@ export const filters = [
   { id: 'vintage', name: '復古',  filter: 'sepia(60%) contrast(90%) brightness(90%)' },
 ];
 
-export const state = {
-  config: {
-    coupleName: 'jim & camilla',
-    weddingDate: '2026.11.07',
-    tagline: 'Wedding Photo Booth',
-    countdownSeconds: 3,
-    theme: { primary: '#f28ca8', secondary: '#fff4f7', ink: '#49333a' },
-  },
-  activeLayout: layouts.strip,
-  activeFrame: 'none',
-  activeFilter: 'none',
-  shots: [],
-  stream: null,
-  facingMode: 'user',
-  busy: false,
-  lastImageData: '',
+export const DEFAULT_CONFIG = {
+  coupleName: 'jim & camilla',
+  weddingDate: '2026.11.07',
+  tagline: 'Wedding Photo Booth',
+  countdownSeconds: 3,
+  theme: { primary: '#f28ca8', secondary: '#fff4f7', ink: '#49333a' },
 };

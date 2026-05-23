@@ -9,10 +9,13 @@
     "build": "vite build"
   },
   "dependencies": {
-    "qrcode-generator": "^2.0.4"
+    "qrcode-generator": "^2.0.4",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4",
+    "@vitejs/plugin-react": "^4.7.0",
     "concurrently": "^9",
     "nodemon": "^3.1.14",
     "tailwindcss": "^4",

@@ -7,6 +7,7 @@ const port = Number(process.env.PORT || 3000);
 const rootDir = __dirname;
 const uploadsDir = path.join(rootDir, "uploads");
 const publicDir = path.join(rootDir, "dist");
+const backgroundsDir = path.join(rootDir, "public", "backgrounds");
 const configPath = path.join(rootDir, "config", "wedding.json");
 
 fs.mkdirSync(uploadsDir, { recursive: true });
@@ -160,6 +161,19 @@ function handlePhotoList(_req, res) {
   sendJson(res, 200, { photos });
 }
 
+function handleBackgroundList(req, res) {
+  fs.mkdirSync(backgroundsDir, { recursive: true });
+  const files = fs
+    .readdirSync(backgroundsDir)
+    .filter((f) => /\.(png|jpe?g|webp)$/i.test(f))
+    .sort();
+  const backgrounds = files.map((filename) => ({
+    filename,
+    url: `/backgrounds/${encodeURIComponent(filename)}`,
+  }));
+  sendJson(res, 200, { backgrounds });
+}
+
 function route(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const pathname = url.pathname;
@@ -183,6 +197,17 @@ function route(req, res) {
 
   if (req.method === "GET" && pathname === "/api/photos") {
     handlePhotoList(req, res);
+    return;
+  }
+
+  if (req.method === "GET" && pathname === "/api/backgrounds") {
+    handleBackgroundList(req, res);
+    return;
+  }
+
+  if (req.method === "GET" && pathname.startsWith("/backgrounds/")) {
+    const filename = path.basename(decodeURIComponent(pathname.replace("/backgrounds/", "")));
+    serveFile(res, path.join(backgroundsDir, filename));
     return;
   }
 
