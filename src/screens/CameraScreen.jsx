@@ -81,22 +81,27 @@ export default function CameraScreen({ onAllShotsTaken, onBack }) {
     const workCanvas = document.querySelector('#workCanvas');
     let currentShots = [];
 
-    while (currentShots.length < required) {
-      const shotNum = currentShots.length + 1;
-      setStatus(`第 ${shotNum} 張，準備好了嗎？`);
-      await runCountdown(config.countdownSeconds, setCountdown);
-      const dataUrl = captureFrame(videoRef.current, workCanvas, activeLayout, activeFilter);
-      currentShots = [...currentShots, dataUrl];
-      setShots(currentShots);
-      setShotCount(currentShots.length);
-      await triggerFlash(flashRef.current);
-      if (currentShots.length < required) {
-        await wait(1200);
+    try {
+      while (currentShots.length < required) {
+        const shotNum = currentShots.length + 1;
+        setStatus(`第 ${shotNum} 張，準備好了嗎？`);
+        await runCountdown(config.countdownSeconds, setCountdown);
+        const dataUrl = captureFrame(videoRef.current, workCanvas, activeLayout, activeFilter);
+        currentShots = [...currentShots, dataUrl];
+        setShots(currentShots);
+        setShotCount(currentShots.length);
+        await triggerFlash(flashRef.current);
+        if (currentShots.length < required) {
+          await wait(1200);
+        }
       }
+      onAllShotsTaken(currentShots);
+    } catch (err) {
+      console.error('Capture error:', err);
+      setStatus('拍攝失敗，請重試。');
+    } finally {
+      setBusy(false);
     }
-
-    setBusy(false);
-    onAllShotsTaken(currentShots);
   }
 
   const required = activeLayout.requiredShots;

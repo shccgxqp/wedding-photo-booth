@@ -30,7 +30,7 @@ export default function ResultScreen({ onShootAgain, onBackToLayouts }) {
               <span className="tiny-label">READY TO SAVE</span>
               <h2>掃碼帶走這張照片</h2>
               <p className="status-text">
-                {hasUpload ? '照片已存到伺服器。' : '上傳失敗，請用下方連結下載。'}
+                {hasUpload ? '掃描 QR Code 或點連結，長按照片儲存到相簿。' : '上傳失敗，請點連結在瀏覽器長按儲存。'}
               </p>
             </div>
             <canvas
@@ -48,15 +48,16 @@ export default function ResultScreen({ onShootAgain, onBackToLayouts }) {
               target="_blank"
               rel="noreferrer"
             >
-              開啟下載連結
+              在瀏覽器開啟照片
             </a>
           ) : blobUrl ? (
             <a
               className="download-link"
               href={blobUrl}
-              download="photo-booth.jpg"
+              target="_blank"
+              rel="noreferrer"
             >
-              下載照片
+              在瀏覽器開啟照片
             </a>
           ) : null}
           <button className="primary-btn" type="button" onClick={onShootAgain}>

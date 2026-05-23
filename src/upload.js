@@ -8,7 +8,10 @@ export async function uploadPhoto(blob, layoutId) {
     body: blob,
   });
   if (!response.ok) throw new Error(`Upload failed: ${response.status}`);
-  return response.json();
+  const data = await response.json();
+  // Build URL from browser origin so QR works on any device (server may see localhost)
+  data.downloadUrl = `${window.location.origin}/photos/${encodeURIComponent(data.filename)}`;
+  return data;
 }
 
 export async function renderQrCode(url, canvasEl) {
