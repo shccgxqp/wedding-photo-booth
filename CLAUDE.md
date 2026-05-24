@@ -31,13 +31,14 @@ npm start            # 正式環境：node server.cjs（在 port 3000 提供 dis
 | [src/main.jsx](src/main.jsx) | React 根節點，包裝 `<AppProvider><App />` |
 | [src/App.jsx](src/App.jsx) | 畫面路由、載入 config/backgrounds、compose+upload 協調 |
 | [src/context/AppContext.jsx](src/context/AppContext.jsx) | 全域狀態（React Context + useState）；`streamRef` 用 useRef |
-| [src/data/constants.js](src/data/constants.js) | `layouts`、`frames`、`filters`、`DEFAULT_CONFIG` |
-| [src/screens/](src/screens/) | LayoutScreen、FrameScreen、CameraScreen、LoadingScreen、ResultScreen |
+| [src/data/constants.js](src/data/constants.js) | `layouts`、`filters`、`DEFAULT_CONFIG` |
+| [src/screens/](src/screens/) | LayoutScreen、CameraScreen、LoadingScreen、ResultScreen |
 | [src/components/](src/components/) | TopBar |
 | [src/frames/](src/frames/) | 各版型的框格設定（zones、overlay URL、文字位置） |
 | [src/camera.js](src/camera.js) | `startCamera`、`stopCamera`、`runCountdown`、`captureFrame`、`triggerFlash` |
-| [src/compose.js](src/compose.js) | Canvas 合成：背景、照片、標題、框格疊圖 |
-| [src/upload.js](src/upload.js) | `POST /api/photos`（blob）、QR code 產生（qrcode-generator） |
+| [src/compose.js](src/compose.js) | Canvas 合成：照片 drawCoverImage 到 ZONES + overlay PNG 疊圖 |
+| [src/gif.js](src/gif.js) | `startClipRecorder`（逐格錄影）、`encodeMultiZoneGif`（多格動態 GIF 合成） |
+| [src/upload.js](src/upload.js) | `POST /api/photos`（blob/gif）、QR code 產生（qrcode-generator） |
 | [src/app.css](src/app.css) | Tailwind v4 + 自訂 CSS（漸層、偽元素、safe-area） |
 
 **設定檔** — [config/wedding.json](config/wedding.json)：熱重載，改完不須重啟。執行時覆寫 CSS 變數 `--pink`、`--blush`、`--ink`。
@@ -46,17 +47,23 @@ npm start            # 正式環境：node server.cjs（在 port 3000 提供 dis
 
 ## 主要流程
 
-**拍照 → 合成 → 上傳：**
+**靜態照片 → 合成 → 上傳：**
 1. `CameraScreen` 掛載時透過 `startCamera(streamRef, videoEl, facingMode)` 啟動鏡頭
 2. `handleCapture()` 循環 `requiredShots` 次：`runCountdown` → `captureFrame` → `triggerFlash`
 3. 拍完呼叫 `onAllShotsTaken(shots)`，交給 `App.jsx`
-4. `App.jsx` 呼叫 `composePhoto(workCanvas, layout, shots, activeFrame, config, backgroundUrl)`
+4. `App.jsx` 呼叫 `composePhoto(workCanvas, layout, shots)`
 5. `uploadPhoto(blob, layoutId)` POST 到 `/api/photos`，伺服器存入 `uploads/`
 6. 用戶端用 `qrcode-generator` 產生 QR code
 
+**動態 GIF → 合成 → 上傳：**
+1. `handleGifCapture()` 循環 `requiredShots` 次：`runCountdown` → `startClipRecorder` 錄影 → `triggerFlash` → 停止錄影存入 clips
+2. 所有格錄完後呼叫 `encodeMultiZoneGif(clips, layoutW, layoutH, zones, overlayUrl)`
+3. 每個 GIF frame = 所有 clip 當前畫面繪入 ZONES + overlay PNG 疊圖
+4. `uploadGif(gifBlob, layoutId)` POST 到 `/api/photos`（image/gif）
+
 **畫面流程：**
 ```
-版型選擇 → 框格選擇（若 skipFrameSelect 則跳過）→ 拍照 → 載入中 → 結果
+版型選擇 → 拍照（靜態或動態）→ 載入中 → 結果
 ```
 
 ---
@@ -65,19 +72,21 @@ npm start            # 正式環境：node server.cjs（在 port 3000 提供 dis
 
 定義於 [src/data/constants.js](src/data/constants.js)：
 
-| id | 名稱 | 張數 | 輸出尺寸 | shotRatio | 備註 |
-|----|------|------|----------|-----------|------|
-| `strip` | 4格直列 | 4 | 720×2160 | 3/4 | |
-| `grid` | 2x2 | 4 | 900×1400 | 3/4 | |
-| `portrait` | 大頭貼 | 1 | 1080×1440 | 780/920 | |
-| `frame01` | 愛心拍貼 | 6 | 784×1176 | 315/332 | `skipFrameSelect: true`、`showHeartGuide: true` |
+| id | 名稱 | 張數 | 輸出尺寸 | shotRatio |
+|----|------|------|----------|-----------|
+| `frame03` | 雲朵直條 | 4 | 858×2532 | 724/543 |
+| `frame02` | 星空直條 | 3 | 784×1176 | 545/365 |
+| `frame01` | 愛心拍貼 | 6 | 779×1172 | 315/332 |
+
+所有版型皆 `skipFrameSelect: true`，無框格選擇畫面。
 
 **新增框格版型步驟：**
-1. 將 PNG 放入 `public/frames/`（透明心形／形狀鏤空）
-2. 建立 `src/frames/frameXX.js`，含 `OVERLAY_URL`、`ZONES`、`TEXT_Y`
-3. 在 `constants.js` 的 `layouts` 加入新項目，設 `skipFrameSelect: true`
-4. 在 `compose.js` 新增 frameXX 的 compose 分支
-5. 在 `app.css` 新增 `.preview-frameXX` 預覽 CSS
+1. 將 PNG 放入 `public/frames/`（透明鏤空）
+2. 建立 `src/frames/frameXX.js`，含 `OVERLAY_URL`、`ZONES`
+3. 在 `constants.js` 的 `layouts` 加入新項目
+4. 在`compose.js` 新增 frameXX 的 compose 分支 + import
+5. 在 `CameraScreen.jsx` 的 `FRAME_GUIDE` 加入新版型
+6. 在 `app.css` 新增 `.preview-frameXX` 預覽 CSS
 
 ## 框格設定格式（src/frames/frameXX.js）
 
@@ -85,20 +94,12 @@ npm start            # 正式環境：node server.cjs（在 port 3000 提供 dis
 export const OVERLAY_URL = '/frames/frameXX.png'; // 透明鏤空的疊圖 PNG
 export const ZONES = [
   { x, y, w, h }, // 每個照片格的邊界框（像素，以 canvas 解析度為準）
-  ...
 ];
-export const TEXT_Y = 1151; // 底部文字條的垂直中心 y 值
 ```
 
-**frame01.png** 必須在愛心區域內部保持透明，讓底層照片透出來。照片先畫在 ZONES 矩形上，再將 frame01.png 疊上去。
+照片先 `drawCoverImage` 繪入 ZONES，再將 overlay PNG 疊上覆蓋邊框。ZONES 需要比透明區域略大（bleed）以覆蓋鋸齒邊緣。
 
----
-
-## 背景圖片
-
-放入 `public/backgrounds/` → 自動出現在框格選擇畫面的背景選擇器。提供網址：`/backgrounds/:filename`。
-
-框格疊圖 PNG 放在 `public/frames/`（不是 backgrounds）。
+**ZONES 校準方法：** 在瀏覽器 console 用 canvas `getImageData` 掃描 PNG 透明像素邊界，再加 bleed。
 
 ---
 
@@ -107,7 +108,7 @@ export const TEXT_Y = 1151; // 底部文字條的垂直中心 y 值
 - `CameraScreen` 的 `updatePreviewRatio()` 根據 `activeLayout.shotRatio` 設定 `.camera-preview` 的精確像素尺寸
 - `<video>` 設定 `position:absolute; object-fit:cover`，防止 Safari 拉伸
 - 掛載時與視窗 resize 時透過雙層 `requestAnimationFrame` 觸發
-- 版型設 `showHeartGuide: true` 時，鏡頭預覽上顯示 SVG 愛心虛線引導框
+- `FRAME_GUIDE` registry（CameraScreen.jsx）：frame01/02/03 → ZONES + PNG URL，相機預覽用 CSS `background-image` 顯示對應格的引導框
 
 ---
 

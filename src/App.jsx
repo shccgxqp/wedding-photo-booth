@@ -5,7 +5,6 @@ import { composePhoto } from './compose.js';
 import { uploadPhoto } from './upload.js';
 import TopBar from './components/TopBar.jsx';
 import LayoutScreen from './screens/LayoutScreen.jsx';
-import FrameScreen from './screens/FrameScreen.jsx';
 import CameraScreen from './screens/CameraScreen.jsx';
 import LoadingScreen from './screens/LoadingScreen.jsx';
 import ResultScreen from './screens/ResultScreen.jsx';
@@ -14,7 +13,6 @@ export default function App() {
   const {
     config, setConfig,
     activeLayout, setActiveLayout,
-    activeFrame, setActiveFrame,
     activeFilter, setActiveFilter,
     shots, setShots,
     facingMode,
@@ -24,10 +22,8 @@ export default function App() {
     streamRef,
     layouts,
     setBackgrounds,
-    selectedBackground, setSelectedBackground,
   } = useApp();
 
-  // Fetch config + backgrounds on mount
   useEffect(() => {
     fetch('/api/config')
       .then((r) => r.json())
@@ -48,7 +44,6 @@ export default function App() {
       .catch(() => {});
   }, []);
 
-  // Lock body scroll on camera/loading/result screens
   useEffect(() => {
     document.body.style.overflow =
       screen === 'camera' || screen === 'loading' || screen === 'result' ? 'hidden' : '';
@@ -58,27 +53,17 @@ export default function App() {
     const layout = layouts[layoutId];
     setActiveLayout(layout);
     setShots([]);
-    setActiveFrame('none');
     setActiveFilter('none');
-    setSelectedBackground(null);
-    setScreen(layout.skipFrameSelect ? 'camera' : 'frame');
-  }
-
-  function handleSelectFrame(frameId) {
-    setActiveFrame(frameId);
     setScreen('camera');
   }
 
   function handleBackToLayouts() {
+    sessionStorage.removeItem('pb_screen');
+    sessionStorage.removeItem('pb_layout');
     stopCamera(streamRef);
     setShots([]);
-    setActiveFrame('none');
     setActiveFilter('none');
     setScreen('layout');
-  }
-
-  function handleBackToFrames() {
-    setScreen('frame');
   }
 
   async function handleAllShotsTaken(capturedShots) {
@@ -87,7 +72,7 @@ export default function App() {
     setScreen('loading');
 
     try {
-      const blob = await composePhoto(workCanvas, activeLayout, capturedShots, activeFrame, config, selectedBackground?.url);
+      const blob = await composePhoto(workCanvas, activeLayout, capturedShots);
       const blobUrl = URL.createObjectURL(blob);
 
       try {
@@ -105,6 +90,20 @@ export default function App() {
     setScreen('result');
   }
 
+  function handleGifComposing() {
+    stopCamera(streamRef);
+    setScreen('loading');
+  }
+
+  function handleGifTaken(result) {
+    setResultData({
+      blobUrl: result.downloadUrl,
+      downloadUrl: result.downloadUrl,
+      filename: result.filename,
+    });
+    setScreen('result');
+  }
+
   function handleShootAgain() {
     setShots([]);
     setScreen('camera');
@@ -116,16 +115,11 @@ export default function App() {
       {screen === 'layout' && (
         <LayoutScreen onSelectLayout={handleSelectLayout} />
       )}
-      {screen === 'frame' && (
-        <FrameScreen
-          onSelectFrame={handleSelectFrame}
-          onBack={handleBackToLayouts}
-        />
-      )}
       {screen === 'camera' && (
         <CameraScreen
           onAllShotsTaken={handleAllShotsTaken}
-          onBack={handleBackToFrames}
+          onGifTaken={handleGifTaken}
+          onGifComposing={handleGifComposing}
           onBackToLayouts={handleBackToLayouts}
         />
       )}

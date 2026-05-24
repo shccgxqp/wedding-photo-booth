@@ -14,6 +14,41 @@ export async function uploadPhoto(blob, layoutId) {
   return data;
 }
 
+export async function uploadClipGif(gifBlob, sessionId, idx) {
+  const params = new URLSearchParams({ session: sessionId, idx });
+  const response = await fetch(`/api/gif/clip?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'image/gif' },
+    body: gifBlob,
+  });
+  if (!response.ok) throw new Error(`Clip upload failed: ${response.status}`);
+}
+
+export async function requestGifCompose(sessionId, layoutId, layoutW, layoutH, zones) {
+  const response = await fetch('/api/gif/compose', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, layoutId, layoutW, layoutH, zones }),
+  });
+  if (!response.ok) throw new Error(`Compose failed: ${response.status}`);
+  const data = await response.json();
+  data.downloadUrl = `${window.location.origin}/photos/${data.token}`;
+  return data;
+}
+
+export async function uploadGif(blob, layoutId = 'gif') {
+  const layout = encodeURIComponent(layoutId);
+  const response = await fetch(`/api/photos?layout=${layout}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'image/gif' },
+    body: blob,
+  });
+  if (!response.ok) throw new Error(`Upload failed: ${response.status}`);
+  const data = await response.json();
+  data.downloadUrl = `${window.location.origin}/photos/${data.token}`;
+  return data;
+}
+
 export async function renderQrCode(url, canvasEl) {
   clearQr(canvasEl);
   const qr = qrcode(0, 'M');

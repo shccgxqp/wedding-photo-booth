@@ -354,22 +354,6 @@ h2 {
     #fff;
 }
 
-.preview-strip {
-  @apply mx-auto;
-  width: min(48%, 160px);
-  grid-template-rows: repeat(4, 1fr);
-}
-
-.preview-grid {
-  grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: repeat(2, 1fr);
-}
-
-.preview-portrait {
-  @apply p-6;
-  grid-template-rows: 1fr;
-}
-
 .preview-frame01 {
   grid-template-columns: repeat(2, 1fr);
   grid-template-rows: repeat(3, 1fr);
@@ -381,6 +365,44 @@ h2 {
   background: rgba(0, 0, 0, 0.45);
   border-color: rgba(255, 255, 255, 0.25);
   border-radius: 50% 50% 45% 45% / 55% 55% 40% 40%;
+}
+
+.preview-frame03 {
+  grid-template-columns: 1fr;
+  grid-template-rows: repeat(4, 1fr);
+  background: linear-gradient(145deg, #7fa8c0, #9bbdd4) !important;
+  outline-color: #5a8aaa !important;
+}
+
+.preview-frame03 .preview-slot {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(90, 110, 130, 0.3);
+  border-radius: 30% / 20%;
+}
+
+.preview-frame02 {
+  grid-template-columns: 1fr;
+  grid-template-rows: repeat(3, 1fr);
+  background: linear-gradient(145deg, #b5a898, #c8b9a8) !important;
+  outline-color: #8a6a4a !important;
+}
+
+.preview-frame02 .preview-slot {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(80, 30, 20, 0.4);
+}
+
+.preview-frame04 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  background: linear-gradient(145deg, #f0ece4, #e8e2d8) !important;
+  outline-color: #c0a870 !important;
+}
+
+.preview-frame04 .preview-slot {
+  background: rgba(20, 20, 20, 0.75);
+  border-color: rgba(200, 180, 140, 0.4);
+  border-radius: 8px;
 }
 
 .layout-copy h3 {
@@ -432,17 +454,7 @@ video {
 .camera-heart-guide {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
   pointer-events: none;
-}
-
-.camera-heart-guide path {
-  animation: heart-dash 1.6s linear infinite;
-}
-
-@keyframes heart-dash {
-  to { stroke-dashoffset: -24; }
 }
 
 .countdown {
@@ -585,7 +597,7 @@ button:disabled {
 }
 
 .qr-canvas {
-  @apply rounded-[20px] border self-center p-3;
+  @apply border self-center p-3;
   width: min(100%, 240px);
   height: auto;
   border-color: var(--line);

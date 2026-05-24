@@ -4,12 +4,24 @@ import {
   startCamera, stopCamera, runCountdown,
   captureFrame, triggerFlash, wait,
 } from '../camera.js';
+import { ZONES as F01_ZONES } from '../frames/frame01.js';
+import { ZONES as F02_ZONES } from '../frames/frame02.js';
+import { ZONES as F03_ZONES } from '../frames/frame03.js';
+import { ZONES as F04_ZONES } from '../frames/frame04.js';
+import { startClipRecorder, encodeClipGif } from '../gif.js';
+import { uploadClipGif, requestGifCompose } from '../upload.js';
 
-export default function CameraScreen({ onAllShotsTaken, onBack }) {
+const FRAME_GUIDE = {
+  frame01: { zones: F01_ZONES, w: 779,  h: 1172, url: '/frames/frame01.png' },
+  frame02: { zones: F02_ZONES, w: 784,  h: 1176, url: '/frames/frame02.png' },
+  frame03: { zones: F03_ZONES, w: 858,  h: 2532, url: '/frames/frame03.png' },
+  frame04: { zones: F04_ZONES, w: 2090, h: 3135, url: '/frames/frame04.png' },
+};
+
+export default function CameraScreen({ onAllShotsTaken, onGifTaken, onGifComposing, onBackToLayouts }) {
   const {
     config,
     activeLayout,
-    activeFrame,
     activeFilter, setActiveFilter,
     shots, setShots,
     facingMode,
@@ -26,8 +38,8 @@ export default function CameraScreen({ onAllShotsTaken, onBack }) {
   const [countdown, setCountdown] = useState(null);
   const [status, setStatus] = useState('看鏡頭，倒數後會自動拍下。');
   const [shotCount, setShotCount] = useState(0);
+  const [previewPx, setPreviewPx] = useState(0);
 
-  // Start camera on mount, stop on unmount
   useEffect(() => {
     if (videoRef.current) {
       startCamera(streamRef, videoRef.current, facingMode, () => {
@@ -37,7 +49,6 @@ export default function CameraScreen({ onAllShotsTaken, onBack }) {
     return () => stopCamera(streamRef);
   }, []);
 
-  // Preview ratio calculation
   useEffect(() => {
     function updateRatio() {
       const wrap = wrapRef.current;
@@ -56,6 +67,7 @@ export default function CameraScreen({ onAllShotsTaken, onBack }) {
       }
       preview.style.width = `${Math.round(pw)}px`;
       preview.style.height = `${Math.round(ph)}px`;
+      setPreviewPx(Math.round(pw));
     }
     const rafId = requestAnimationFrame(() => requestAnimationFrame(updateRatio));
     window.addEventListener('resize', updateRatio);
@@ -65,7 +77,6 @@ export default function CameraScreen({ onAllShotsTaken, onBack }) {
     };
   }, [activeLayout]);
 
-  // Apply CSS filter to video
   useEffect(() => {
     if (!videoRef.current) return;
     const filterObj = filters.find((f) => f.id === activeFilter);
@@ -104,9 +115,79 @@ export default function CameraScreen({ onAllShotsTaken, onBack }) {
     }
   }
 
+  async function handleGifCapture() {
+    if (busy || !streamRef.current) return;
+    setBusy(true);
+
+    const required = activeLayout.requiredShots;
+    const fg = FRAME_GUIDE[activeLayout.id];
+    const sessionId = crypto.randomUUID
+      ? crypto.randomUUID().replace(/-/g, '')
+      : Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+    const uploadPromises = [];
+
+    try {
+      for (let i = 0; i < required; i++) {
+        setStatus(`動態第 ${i + 1} 格，準備好了嗎？`);
+        setShotCount(i);
+        const recorder = startClipRecorder(videoRef.current);
+        await runCountdown(config.countdownSeconds, setCountdown);
+        const frames = recorder.stop();
+        await triggerFlash(flashRef.current);
+
+        // encode + upload in background — don't block next shot
+        const clipGif = encodeClipGif(frames);
+        uploadPromises.push(uploadClipGif(clipGif, sessionId, i));
+
+        if (i < required - 1) {
+          setStatus(`第 ${i + 1} 格完成，繼續下一格...`);
+          await wait(600);
+        }
+      }
+
+      setStatus('等待上傳完成...');
+      await Promise.all(uploadPromises);
+      setCountdown(null);
+      onGifComposing();
+
+      let result;
+      try {
+        result = await requestGifCompose(
+          sessionId,
+          activeLayout.id,
+          activeLayout.width,
+          activeLayout.height,
+          fg ? fg.zones : [],
+        );
+      } catch (composeErr) {
+        console.error('GIF compose error:', composeErr);
+        result = { downloadUrl: null, filename: null };
+      }
+      onGifTaken(result);
+    } catch (err) {
+      console.error('GIF capture error:', err);
+      setStatus('錄製失敗，請重試。');
+      setBusy(false);
+    }
+  }
+
   const required = activeLayout.requiredShots;
   const nextShot = Math.min(shotCount + 1, required);
   const isSmile = countdown === 'smile';
+
+  const heartGuideStyle = (() => {
+    const fg = FRAME_GUIDE[activeLayout.id];
+    if (!fg || previewPx === 0) return null;
+    const zone = fg.zones[Math.min(shotCount, fg.zones.length - 1)];
+    const scale = previewPx / zone.w;
+    return {
+      backgroundImage: `url(${fg.url})`,
+      backgroundSize: `${Math.round(fg.w * scale)}px ${Math.round(fg.h * scale)}px`,
+      backgroundPosition: `${-Math.round(zone.x * scale)}px ${-Math.round(zone.y * scale)}px`,
+      backgroundRepeat: 'no-repeat',
+    };
+  })();
 
   return (
     <section className="stage">
@@ -115,16 +196,8 @@ export default function CameraScreen({ onAllShotsTaken, onBack }) {
           <div className="camera-preview-wrap" ref={wrapRef}>
             <div className="camera-preview" ref={previewRef}>
               <video ref={videoRef} autoPlay playsInline muted />
-              {activeLayout.showHeartGuide && (
-                <svg className="camera-heart-guide" viewBox="-22 -5 359 376" aria-hidden="true">
-                  <path
-                    d="M 157.5 332 C 126 249 0 166 0 106 C 0 20 110 0 157.5 93 C 205 0 315 20 315 106 C 315 166 189 249 157.5 332 Z"
-                    fill="none"
-                    stroke="rgba(255,255,255,0.78)"
-                    strokeWidth="5"
-                    strokeDasharray="14 10"
-                  />
-                </svg>
+              {heartGuideStyle && (
+                <div className="camera-heart-guide" style={heartGuideStyle} aria-hidden="true" />
               )}
               {countdown !== null && (
                 <div className={`countdown${isSmile ? ' countdown--smile' : ''}`}>
@@ -153,6 +226,14 @@ export default function CameraScreen({ onAllShotsTaken, onBack }) {
           <h2>準備拍攝</h2>
           <p className="status-text">{status}</p>
           <button
+            className="ghost-btn"
+            type="button"
+            disabled={busy}
+            onClick={handleGifCapture}
+          >
+            拍攝動態照片
+          </button>
+          <button
             className="primary-btn"
             type="button"
             disabled={busy}
@@ -164,9 +245,9 @@ export default function CameraScreen({ onAllShotsTaken, onBack }) {
             className="ghost-btn"
             type="button"
             disabled={busy}
-            onClick={onBack}
+            onClick={onBackToLayouts}
           >
-            回邊框選擇
+            回版型選擇
           </button>
         </aside>
       </div>
