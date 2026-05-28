@@ -13,16 +13,26 @@ npm start            # 正式環境：node server.cjs（在 port 3000 提供 dis
 
 健康檢查：`GET http://localhost:3000/health` → `{ "ok": true }`
 
-開發時前端跑在 **5173**（Vite HMR）。`/api/*` 和 `/photos/*` 的請求會代理到後端 port 3000。
+開發時前端跑在 **5173**（Vite HMR）。`/api/*`、`/photos/*`、`/view/*` 的請求會代理到後端 port 3000。
+
+**ffmpeg（影片模式必要）：**
+```bash
+brew install ffmpeg      # macOS
+apt install ffmpeg       # Ubuntu/Debian
+winget install ffmpeg    # Windows
+```
+未安裝時影片仍可錄製，但不會轉成 H.264 MP4，LINE / IG 可能不相容。
 
 ---
 
 ## 架構
 
 **後端** — [server.cjs](server.cjs)：純 `node:http`，無框架。正式環境提供 `dist/`。路由：
-- `/photos/:filename` → `uploads/` 目錄
-- `/backgrounds/:filename` → `public/backgrounds/`
-- `/frames/*`、其他靜態檔 → `public/`
+- `GET /view/:token` → HTML landing page（預覽 + 儲存按鈕，QR code 指向此處）
+- `GET /photos/:token` → `uploads/` 原始檔（影片支援 Range requests）
+- `POST /api/photos` → 接受 image/* 或 video/*；影片自動 ffmpeg 轉 H.264 MP4 faststart
+- `GET /backgrounds/:filename` → `public/backgrounds/`
+- `GET /frames/*`、其他靜態檔 → `public/`
 
 **前端** — React 18 + Vite。原始碼在 [src/](src/)，建置輸出至 `dist/`：
 
@@ -34,11 +44,12 @@ npm start            # 正式環境：node server.cjs（在 port 3000 提供 dis
 | [src/data/constants.js](src/data/constants.js) | `layouts`、`filters`、`DEFAULT_CONFIG` |
 | [src/screens/](src/screens/) | LayoutScreen、CameraScreen、LoadingScreen、ResultScreen |
 | [src/components/](src/components/) | TopBar |
-| [src/frames/](src/frames/) | 各版型的框格設定（zones、overlay URL、文字位置） |
+| [src/frames/](src/frames/) | 各版型的框格設定（zones、overlay URL） |
 | [src/camera.js](src/camera.js) | `startCamera`、`stopCamera`、`runCountdown`、`captureFrame`、`triggerFlash` |
 | [src/compose.js](src/compose.js) | Canvas 合成：照片 drawCoverImage 到 ZONES + overlay PNG 疊圖 |
-| [src/gif.js](src/gif.js) | `startClipRecorder`（逐格錄影）、`encodeMultiZoneGif`（多格動態 GIF 合成） |
-| [src/upload.js](src/upload.js) | `POST /api/photos`（blob/gif）、QR code 產生（qrcode-generator） |
+| [src/gif.js](src/gif.js) | `startClipRecorder`（逐格錄影）、server-side GIF 合成用 clip 上傳 |
+| [src/video.js](src/video.js) | `startVideoClipRecorder`（MediaRecorder 錄 2s clip）、`composeMultiZoneVideo`（client-side 合成） |
+| [src/upload.js](src/upload.js) | `uploadPhoto`、`uploadVideo`、GIF 相關上傳、QR code 產生 |
 | [src/app.css](src/app.css) | Tailwind v4 + 自訂 CSS（漸層、偽元素、safe-area） |
 
 **設定檔** — [config/wedding.json](config/wedding.json)：熱重載，改完不須重啟。執行時覆寫 CSS 變數 `--pink`、`--blush`、`--ink`。
@@ -49,22 +60,41 @@ npm start            # 正式環境：node server.cjs（在 port 3000 提供 dis
 
 **靜態照片 → 合成 → 上傳：**
 1. `CameraScreen` 掛載時透過 `startCamera(streamRef, videoEl, facingMode)` 啟動鏡頭
-2. `handleCapture()` 循環 `requiredShots` 次：`runCountdown` → `captureFrame` → `triggerFlash`
+2. `handleCapture()` 循環 `requiredShots` 次：`runCountdown` → `captureFrame`（含水平翻轉）→ `triggerFlash`
 3. 拍完呼叫 `onAllShotsTaken(shots)`，交給 `App.jsx`
 4. `App.jsx` 呼叫 `composePhoto(workCanvas, layout, shots)`
 5. `uploadPhoto(blob, layoutId)` POST 到 `/api/photos`，伺服器存入 `uploads/`
-6. 用戶端用 `qrcode-generator` 產生 QR code
+6. QR code 指向 `/photos/:token`
 
-**動態 GIF → 合成 → 上傳：**
-1. `handleGifCapture()` 循環 `requiredShots` 次：`runCountdown` → `startClipRecorder` 錄影 → `triggerFlash` → 停止錄影存入 clips
-2. 所有格錄完後呼叫 `encodeMultiZoneGif(clips, layoutW, layoutH, zones, overlayUrl)`
-3. 每個 GIF frame = 所有 clip 當前畫面繪入 ZONES + overlay PNG 疊圖
-4. `uploadGif(gifBlob, layoutId)` POST 到 `/api/photos`（image/gif）
+**影片 → 合成 → 上傳（新）：**
+1. `handleVideoCapture()` 循環 `requiredShots` 次：`runCountdown` → `startVideoClipRecorder(stream, 2000ms)` → `triggerFlash` → 等候 clip blob
+2. 所有格錄完後呼叫 `onVideoComposing()`（App 停鏡頭、顯示 loading）
+3. `composeMultiZoneVideo(clips, zones, layoutW, layoutH, overlayUrl)` 在 client 端用 canvas + MediaRecorder 合成
+   - 每格 clip 水平翻轉（與 captureFrame 一致）
+   - 解析度 cap：`min(1080/layoutW, 1920/layoutH, 1)`
+4. `uploadVideo(blob, layoutId)` POST 到 `/api/photos`
+5. Server 用 ffmpeg 轉 H.264 MP4 + `-movflags +faststart`（LINE 縮圖、IG 相容必要）
+6. QR code 指向 `/view/:token`（HTML landing page，含 Web Share API 存到相簿按鈕）
+
+**動態 GIF → 合成 → 上傳（舊）：**
+1. `handleGifCapture()` 循環 `requiredShots` 次：`runCountdown` → `startClipRecorder` 錄影 → `triggerFlash` → 停止錄影
+2. 逐格上傳 clip 到 `/api/gif/clip`，之後呼叫 `/api/gif/compose`（server-side 合成）
+3. QR code 指向 `/photos/:token`
 
 **畫面流程：**
 ```
-版型選擇 → 拍照（靜態或動態）→ 載入中 → 結果
+版型選擇 → 拍照（靜態 / 影片 / GIF）→ 載入中 → 結果
 ```
+
+---
+
+## 賓客下載影片流程（/view/:token）
+
+QR code → `/view/:token` HTML 頁面：
+- **iOS Safari**：點「儲存影片到相簿」→ Web Share API → 原生分享選單 → 「儲存影片」→ 相簿
+- **LINE 內建瀏覽器**：自動顯示「在 Safari 中開啟」按鈕
+- **Android Chrome**：Web Share API 或 fallback download
+- **桌機**：blob download fallback
 
 ---
 
@@ -74,6 +104,7 @@ npm start            # 正式環境：node server.cjs（在 port 3000 提供 dis
 
 | id | 名稱 | 張數 | 輸出尺寸 | shotRatio |
 |----|------|------|----------|-----------|
+| `frame04` | 派對四格 | 4 | 2090×3135 | 910/1074 |
 | `frame03` | 雲朵直條 | 4 | 858×2532 | 724/543 |
 | `frame02` | 星空直條 | 3 | 784×1176 | 545/365 |
 | `frame01` | 愛心拍貼 | 6 | 779×1172 | 315/332 |
@@ -84,7 +115,7 @@ npm start            # 正式環境：node server.cjs（在 port 3000 提供 dis
 1. 將 PNG 放入 `public/frames/`（透明鏤空）
 2. 建立 `src/frames/frameXX.js`，含 `OVERLAY_URL`、`ZONES`
 3. 在 `constants.js` 的 `layouts` 加入新項目
-4. 在`compose.js` 新增 frameXX 的 compose 分支 + import
+4. 在 `compose.js` 新增 frameXX 的 compose 分支 + import
 5. 在 `CameraScreen.jsx` 的 `FRAME_GUIDE` 加入新版型
 6. 在 `app.css` 新增 `.preview-frameXX` 預覽 CSS
 
@@ -108,7 +139,8 @@ export const ZONES = [
 - `CameraScreen` 的 `updatePreviewRatio()` 根據 `activeLayout.shotRatio` 設定 `.camera-preview` 的精確像素尺寸
 - `<video>` 設定 `position:absolute; object-fit:cover`，防止 Safari 拉伸
 - 掛載時與視窗 resize 時透過雙層 `requestAnimationFrame` 觸發
-- `FRAME_GUIDE` registry（CameraScreen.jsx）：frame01/02/03 → ZONES + PNG URL，相機預覽用 CSS `background-image` 顯示對應格的引導框
+- `FRAME_GUIDE` registry（CameraScreen.jsx）：frame01/02/03/04 → ZONES + PNG URL，相機預覽用 CSS `background-image` 顯示對應格的引導框
+- **水平翻轉**：`captureFrame` 和 `composeMultiZoneVideo` 的 `drawFrame` 均做 `ctx.scale(-1,1)`，確保輸出與 overlay 方向一致
 
 ---
 
@@ -205,7 +237,7 @@ pip install playwright
 python -m playwright install chromium
 ```
 
-`scripts/with_server.py` — 啟動開發伺服器，等待 port 5175，執行指令，結束後關閉伺服器。
+`scripts/with_server.py` — 啟動開發伺服器，等待 port 5173，執行指令，結束後關閉伺服器。
 `scripts/test_webapp.py` — 12 個 Playwright 測試：版型畫面、框格選擇、frame01 直跳鏡頭、愛心引導框、拍攝計數、濾鏡列、返回導覽。
 
 **規則：回報任務完成前必須先跑測試。測試失敗則修復後才能 commit。**
@@ -218,5 +250,6 @@ python -m playwright install chromium
 
 - 執行 `npm run build` 再 `npm start`
 - 在 `config/wedding.json` 設定 `publicBaseUrl` 或 `PUBLIC_BASE_URL` 環境變數
+- 確認 `ffmpeg` 已安裝（`ffmpeg -version`）
 - 活動前清空 `uploads/`
 - 部署於 HTTPS（iPad／手機鏡頭存取必要）

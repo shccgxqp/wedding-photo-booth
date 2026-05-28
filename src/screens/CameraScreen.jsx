@@ -8,8 +8,9 @@ import { ZONES as F01_ZONES } from '../frames/frame01.js';
 import { ZONES as F02_ZONES } from '../frames/frame02.js';
 import { ZONES as F03_ZONES } from '../frames/frame03.js';
 import { ZONES as F04_ZONES } from '../frames/frame04.js';
-import { startClipRecorder, encodeClipGif } from '../gif.js';
-import { uploadClipGif, requestGifCompose } from '../upload.js';
+import { startClipRecorder, encodeClipGif, startClipRecorderHQ, encodeFramesAsJpegs, RECORD_MS } from '../gif.js';
+import { uploadClipGif, requestGifCompose, uploadJpegFrame, requestGifComposeJpeg } from '../upload.js';
+import { startVideoClipRecorder, composeMultiZoneVideo, VIDEO_DURATION_MS, getBestVideoMime, isIgCompatible } from '../video.js';
 
 const FRAME_GUIDE = {
   frame01: { zones: F01_ZONES, w: 779,  h: 1172, url: '/frames/frame01.png' },
@@ -18,7 +19,7 @@ const FRAME_GUIDE = {
   frame04: { zones: F04_ZONES, w: 2090, h: 3135, url: '/frames/frame04.png' },
 };
 
-export default function CameraScreen({ onAllShotsTaken, onGifTaken, onGifComposing, onBackToLayouts }) {
+export default function CameraScreen({ onAllShotsTaken, onGifTaken, onGifComposing, onVideoReady, onVideoComposing, onBackToLayouts }) {
   const {
     config,
     activeLayout,
@@ -115,6 +116,56 @@ export default function CameraScreen({ onAllShotsTaken, onGifTaken, onGifComposi
     }
   }
 
+  async function handleVideoCapture() {
+    if (busy || !streamRef.current) return;
+    setBusy(true);
+
+    const required = activeLayout.requiredShots;
+    const fg = FRAME_GUIDE[activeLayout.id];
+    const clips = [];
+
+    try {
+      for (let i = 0; i < required; i++) {
+        setStatus(`影片第 ${i + 1} 格，準備好了嗎？`);
+        setShotCount(i);
+        await runCountdown(config.countdownSeconds, setCountdown);
+        setCountdown('rec');
+
+        const clipRec = startVideoClipRecorder(streamRef.current, VIDEO_DURATION_MS);
+        await triggerFlash(flashRef.current);
+
+        setStatus(`錄製中...`);
+        const blob = await clipRec.blobPromise;
+        clips.push(blob);
+        setCountdown(null);
+
+        if (i < required - 1) {
+          setStatus(`第 ${i + 1} 格完成，繼續下一格...`);
+          await wait(600);
+        }
+      }
+
+      setStatus('合成影片中...');
+      setCountdown(null);
+      onVideoComposing();
+
+      const videoBlob = await composeMultiZoneVideo(
+        clips,
+        fg ? fg.zones : [],
+        activeLayout.width,
+        activeLayout.height,
+        fg ? fg.url : '',
+        VIDEO_DURATION_MS,
+      );
+
+      onVideoReady(videoBlob);
+    } catch (err) {
+      console.error('Video capture error:', err);
+      setStatus('影片錄製失敗，請重試。');
+      setBusy(false);
+    }
+  }
+
   async function handleGifCapture() {
     if (busy || !streamRef.current) return;
     setBusy(true);
@@ -131,7 +182,7 @@ export default function CameraScreen({ onAllShotsTaken, onGifTaken, onGifComposi
       for (let i = 0; i < required; i++) {
         setStatus(`動態第 ${i + 1} 格，準備好了嗎？`);
         setShotCount(i);
-        const recorder = startClipRecorder(videoRef.current);
+        const recorder = startClipRecorder(videoRef.current, activeFilter);
         await runCountdown(config.countdownSeconds, setCountdown);
         const frames = recorder.stop();
         await triggerFlash(flashRef.current);
@@ -172,9 +223,97 @@ export default function CameraScreen({ onAllShotsTaken, onGifTaken, onGifComposi
     }
   }
 
+  async function handleGifCaptureHQ() {
+    if (busy || !streamRef.current) return;
+    setBusy(true);
+
+    const required = activeLayout.requiredShots;
+    const fg = FRAME_GUIDE[activeLayout.id];
+    const sessionId = crypto.randomUUID
+      ? crypto.randomUUID().replace(/-/g, '')
+      : Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+    // smile duration inside runCountdown (700ms) already counts as recording time
+    const SMILE_HOLD_MS = 700;
+
+    const uploadPromises = [];
+
+    try {
+      for (let i = 0; i < required; i++) {
+        setStatus(`動態第 ${i + 1} 格，準備好了嗎？`);
+        setShotCount(i);
+
+        let recorder = null;
+
+        // Intercept 'smile' tick to start recording + flash
+        const smileTick = (value) => {
+          setCountdown(value);
+          if (value === 'smile') {
+            recorder = startClipRecorderHQ(videoRef.current, activeFilter);
+            // Initial shutter flash then pulse during recording
+            triggerFlash(flashRef.current).then(() => {
+              flashRef.current?.classList.add('recording-pulse');
+            });
+          }
+        };
+
+        await runCountdown(config.countdownSeconds, smileTick);
+        // runCountdown resolves after smile shown SMILE_HOLD_MS then set null
+        // recording started at smile → already SMILE_HOLD_MS elapsed
+
+        const remaining = RECORD_MS - SMILE_HOLD_MS;
+        if (remaining > 0) await wait(remaining);
+
+        // Stop recording flash
+        flashRef.current?.classList.remove('recording-pulse');
+
+        const frames = recorder ? recorder.stop() : [];
+
+        const clipIdx = i;
+        uploadPromises.push(
+          encodeFramesAsJpegs(frames).then(jpegBlobs =>
+            Promise.all(jpegBlobs.map((blob, frameIdx) =>
+              uploadJpegFrame(blob, sessionId, clipIdx, frameIdx)
+            ))
+          )
+        );
+
+        if (i < required - 1) {
+          setStatus(`第 ${i + 1} 格完成，繼續下一格...`);
+          await wait(600);
+        }
+      }
+
+      setStatus('等待上傳完成...');
+      await Promise.all(uploadPromises);
+      setCountdown(null);
+      onGifComposing();
+
+      let result;
+      try {
+        result = await requestGifComposeJpeg(
+          sessionId,
+          activeLayout.id,
+          activeLayout.width,
+          activeLayout.height,
+          fg ? fg.zones : [],
+        );
+      } catch (composeErr) {
+        console.error('GIF HQ compose error:', composeErr);
+        result = null;
+      }
+      onGifTaken({ gifModes: result });
+    } catch (err) {
+      console.error('GIF HQ capture error:', err);
+      setStatus('錄製失敗，請重試。');
+      setBusy(false);
+    }
+  }
+
   const required = activeLayout.requiredShots;
   const nextShot = Math.min(shotCount + 1, required);
   const isSmile = countdown === 'smile';
+  const isRec = countdown === 'rec';
 
   const heartGuideStyle = (() => {
     const fg = FRAME_GUIDE[activeLayout.id];
@@ -200,8 +339,8 @@ export default function CameraScreen({ onAllShotsTaken, onGifTaken, onGifComposi
                 <div className="camera-heart-guide" style={heartGuideStyle} aria-hidden="true" />
               )}
               {countdown !== null && (
-                <div className={`countdown${isSmile ? ' countdown--smile' : ''}`}>
-                  {isSmile ? 'smile' : countdown}
+                <div className={`countdown${isSmile ? ' countdown--smile' : ''}${isRec ? ' countdown--rec' : ''}`}>
+                  {isSmile ? 'smile' : isRec ? '●REC' : countdown}
                 </div>
               )}
               <div className="shot-badge">{nextShot} / {required}</div>
@@ -229,9 +368,18 @@ export default function CameraScreen({ onAllShotsTaken, onGifTaken, onGifComposi
             className="ghost-btn"
             type="button"
             disabled={busy}
-            onClick={handleGifCapture}
+            onClick={config.gifMode === 'test' ? handleGifCaptureHQ : handleGifCapture}
           >
-            拍攝動態照片
+            {config.gifMode === 'test' ? '拍攝動動照片（品質測試）' : '拍攝動動照片'}
+          </button>
+          <button
+            className="ghost-btn"
+            type="button"
+            disabled={busy}
+            onClick={handleVideoCapture}
+            title={isIgCompatible(getBestVideoMime()) ? 'MP4 — 可直接上傳 IG 限動' : 'WebM — 需轉檔才能上傳 IG'}
+          >
+            拍攝影片 {isIgCompatible(getBestVideoMime()) ? '🎬' : '🎬⚠️'}
           </button>
           <button
             className="primary-btn"

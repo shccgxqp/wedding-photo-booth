@@ -2,12 +2,13 @@ import { useEffect } from 'react';
 import { useApp } from './context/AppContext.jsx';
 import { stopCamera } from './camera.js';
 import { composePhoto } from './compose.js';
-import { uploadPhoto } from './upload.js';
+import { uploadPhoto, uploadVideo } from './upload.js';
 import TopBar from './components/TopBar.jsx';
 import LayoutScreen from './screens/LayoutScreen.jsx';
 import CameraScreen from './screens/CameraScreen.jsx';
 import LoadingScreen from './screens/LoadingScreen.jsx';
 import ResultScreen from './screens/ResultScreen.jsx';
+import FilterEditorScreen from './screens/FilterEditorScreen.jsx';
 
 export default function App() {
   const {
@@ -95,12 +96,41 @@ export default function App() {
     setScreen('loading');
   }
 
+  function handleVideoComposing() {
+    stopCamera(streamRef);
+    setScreen('loading');
+  }
+
+  async function handleVideoReady(videoBlob) {
+    const blobUrl = URL.createObjectURL(videoBlob);
+    try {
+      const result = await uploadVideo(videoBlob, activeLayout.id);
+      setResultData({ blobUrl, downloadUrl: result.downloadUrl, rawUrl: result.rawUrl, filename: result.filename, isVideo: true });
+    } catch (uploadErr) {
+      console.error('Video upload failed:', uploadErr);
+      setResultData({ blobUrl, downloadUrl: null, filename: null, isVideo: true });
+    }
+    setScreen('result');
+  }
+
   function handleGifTaken(result) {
-    setResultData({
-      blobUrl: result.downloadUrl,
-      downloadUrl: result.downloadUrl,
-      filename: result.filename,
-    });
+    if (result.gifModes) {
+      const best = result.gifModes.opt || result.gifModes.high || result.gifModes.med || result.gifModes.low;
+      const modeCount = Object.keys(result.gifModes).length;
+      setResultData({
+        blobUrl: best?.downloadUrl || null,
+        downloadUrl: best?.downloadUrl || null,
+        filename: best?.filename || null,
+        // only pass gifModes to ResultScreen when comparing multiple variants
+        gifModes: modeCount > 1 ? result.gifModes : undefined,
+      });
+    } else {
+      setResultData({
+        blobUrl: result.downloadUrl,
+        downloadUrl: result.downloadUrl,
+        filename: result.filename,
+      });
+    }
     setScreen('result');
   }
 
@@ -113,13 +143,21 @@ export default function App() {
     <main className="app-shell">
       <TopBar />
       {screen === 'layout' && (
-        <LayoutScreen onSelectLayout={handleSelectLayout} />
+        <LayoutScreen
+          onSelectLayout={handleSelectLayout}
+          onOpenFilterEditor={() => setScreen('filter-editor')}
+        />
+      )}
+      {screen === 'filter-editor' && (
+        <FilterEditorScreen onBack={() => setScreen('layout')} />
       )}
       {screen === 'camera' && (
         <CameraScreen
           onAllShotsTaken={handleAllShotsTaken}
           onGifTaken={handleGifTaken}
           onGifComposing={handleGifComposing}
+          onVideoReady={handleVideoReady}
+          onVideoComposing={handleVideoComposing}
           onBackToLayouts={handleBackToLayouts}
         />
       )}

@@ -36,6 +36,46 @@ export async function requestGifCompose(sessionId, layoutId, layoutW, layoutH, z
   return data;
 }
 
+export async function uploadJpegFrame(jpegBlob, sessionId, clipIdx, frameIdx) {
+  const params = new URLSearchParams({ session: sessionId, clip: clipIdx, frame: frameIdx });
+  const response = await fetch(`/api/gif/frame?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'image/jpeg' },
+    body: jpegBlob,
+  });
+  if (!response.ok) throw new Error(`Frame upload failed: ${response.status}`);
+}
+
+export async function requestGifComposeJpeg(sessionId, layoutId, layoutW, layoutH, zones) {
+  const response = await fetch('/api/gif/compose', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, layoutId, layoutW, layoutH, zones, mode: 'jpeg' }),
+  });
+  if (!response.ok) throw new Error(`Compose failed: ${response.status}`);
+  const data = await response.json();
+  const origin = window.location.origin;
+  for (const key of Object.keys(data)) {
+    data[key].downloadUrl = `${origin}/photos/${data[key].token}`;
+  }
+  return data;
+}
+
+export async function uploadVideo(blob, layoutId = 'video') {
+  const layout = encodeURIComponent(layoutId);
+  const response = await fetch(`/api/photos?layout=${layout}`, {
+    method: 'POST',
+    headers: { 'Content-Type': blob.type || 'video/mp4' },
+    body: blob,
+  });
+  if (!response.ok) throw new Error(`Video upload failed: ${response.status}`);
+  const data = await response.json();
+  // QR code points to landing page (/view/) for save-to-Photos UX
+  data.downloadUrl = `${window.location.origin}/view/${data.token}`;
+  data.rawUrl = `${window.location.origin}/photos/${data.token}`;
+  return data;
+}
+
 export async function uploadGif(blob, layoutId = 'gif') {
   const layout = encodeURIComponent(layoutId);
   const response = await fetch(`/api/photos?layout=${layout}`, {
