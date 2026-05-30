@@ -46,11 +46,10 @@ export const layouts = {
 };
 
 export const filters = [
-  { id: 'none',    name: '原色',  filter: 'none' },
+  { id: 'natural', name: '原色',  filter: 'brightness(1.06) contrast(0.9) saturate(0.95)' },
+  { id: 'fresh',   name: '清新',  filter: 'brightness(1.12) contrast(0.86) saturate(0.8) hue-rotate(2deg) opacity(0.98)' },
+  { id: 'vintage', name: '美式復古', filter: 'brightness(0.9) contrast(1.24) saturate(1.19) sepia(1) grayscale(0.17)' },
   { id: 'bw',      name: '黑白',  filter: 'grayscale(100%)' },
-  { id: 'warm',    name: '暖調',  filter: 'sepia(40%) saturate(140%)' },
-  { id: 'cool',    name: '冷調',  filter: 'hue-rotate(190deg) saturate(90%)' },
-  { id: 'vintage', name: '復古',  filter: 'sepia(60%) contrast(90%) brightness(90%)' },
 ];
 
 export const DEFAULT_CONFIG = {

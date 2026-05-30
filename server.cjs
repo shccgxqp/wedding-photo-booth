@@ -160,13 +160,14 @@ function buildViewPage({ filename, rawToken, isVideo, config }) {
   const safeDate  = escHtml(config.weddingDate || "");
   const safeTag   = escHtml(config.tagline || "Wedding Photo Booth");
   const safePink  = escHtml((config.theme && config.theme.primary) || "#f28ca8");
-  const mediaEl   = isVideo
-    ? `<video src="${escHtml(photoUrl)}" autoplay loop muted playsinline style="width:100%;display:block;border-radius:14px;"></video>`
-    : `<img src="${escHtml(photoUrl)}" alt="wedding photo" style="width:100%;display:block;border-radius:14px;">`;
   const btnLabel  = isVideo ? "儲存影片到相簿" : "長按圖片儲存 / 分享";
   const hintText  = isVideo
     ? "點按後選「儲存影片」存到相簿，再上傳 IG 限動或傳 LINE。"
     : "長按圖片選「儲存影像」存到相簿，或點下方按鈕分享。";
+
+  const mediaEl = isVideo
+    ? `<video id="mainVideo" src="${escHtml(photoUrl)}" autoplay loop muted playsinline preload="auto" style="width:100%;display:block;border-radius:14px;"></video>`
+    : `<img id="mainImg" src="${escHtml(photoUrl)}" alt="wedding photo" style="width:100%;display:block;border-radius:14px;">`;
 
   return `<!DOCTYPE html>
 <html lang="zh-TW">
@@ -179,57 +180,135 @@ function buildViewPage({ filename, rawToken, isVideo, config }) {
 <title>${safeName} · ${safeTag}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#1a0d10;color:#fff;font-family:-apple-system,"Helvetica Neue",sans-serif;
+body{background:radial-gradient(ellipse at 50% 35%,#241712 0%,#140d09 75%,#0a0605 100%);
+  color:#F4EAD6;font-family:-apple-system,"Helvetica Neue",sans-serif;
   min-height:100dvh;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;padding:24px 16px;gap:18px;text-align:center}
-.label{font-size:.78rem;letter-spacing:.22em;opacity:.55;text-transform:uppercase}
-.couple{font-size:1.55rem;font-weight:800;letter-spacing:.06em}
+  justify-content:center;padding:24px 16px;gap:16px;text-align:center}
+.label{font-size:.72rem;letter-spacing:.38em;color:#C9AE84;text-transform:uppercase}
+.couple{font-size:1.45rem;font-weight:700;letter-spacing:.08em;color:#FBF4E6}
+
+/* Loading box */
+#loadingBox{display:flex;flex-direction:column;align-items:center;gap:14px;
+  width:100%;max-width:320px}
+.ld-ring{width:52px;height:52px;border-radius:50%;
+  border:3px solid rgba(228,201,126,.2);border-top-color:#E4C97E;
+  animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ld-label{font-size:.78rem;letter-spacing:.32em;color:#C9AE84}
+.ld-track{width:200px;height:4px;background:rgba(228,201,126,.18);border-radius:999px;overflow:hidden}
+.ld-bar{height:100%;width:0%;background:linear-gradient(90deg,#BD9A4E,#E4C97E);
+  border-radius:999px;transition:width .3s ease}
+.ld-pct{font-size:.72rem;color:#937659;font-variant-numeric:tabular-nums;min-width:3ch}
+
+/* Media */
 .media{max-width:360px;width:100%;border-radius:14px;overflow:hidden;
-  box-shadow:0 8px 48px rgba(0,0,0,.55)}
-.save-btn{background:${safePink};color:#fff;border:none;border-radius:999px;
-  padding:15px 0;font-size:1.05rem;font-weight:700;cursor:pointer;
-  width:100%;max-width:360px;-webkit-tap-highlight-color:transparent}
-.save-btn:disabled{opacity:.6}
-.hint{font-size:.8rem;opacity:.5;max-width:300px;line-height:1.6}
-.open-safari{display:none;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
-  border-radius:999px;padding:11px 0;font-size:.9rem;color:#fff;cursor:pointer;
-  width:100%;max-width:360px;margin-top:-4px}
+  box-shadow:0 36px 70px -28px rgba(0,0,0,.82);display:none}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.media.ready{display:block;animation:fadeUp .45s ease}
+
+/* Buttons */
+.save-btn{background:linear-gradient(180deg,#E4C97E,#8C6E32);color:#3a2c12;
+  border:none;border-radius:999px;padding:15px 0;font-size:1rem;font-weight:700;
+  cursor:pointer;width:100%;max-width:360px;-webkit-tap-highlight-color:transparent;
+  box-shadow:0 12px 26px -10px rgba(0,0,0,.65);letter-spacing:.18em}
+.save-btn:disabled{opacity:.55;cursor:wait}
+.hint{font-size:.78rem;color:#937659;max-width:300px;line-height:1.65}
+.open-safari{display:none;background:rgba(244,234,214,.08);
+  border:1px solid rgba(228,201,126,.3);border-radius:999px;
+  padding:11px 0;font-size:.88rem;color:#F4EAD6;cursor:pointer;
+  width:100%;max-width:360px}
 </style>
 </head>
 <body>
 <p class="label">${safeTag}</p>
 <p class="couple">${safeName}</p>
-<div class="media">${mediaEl}</div>
-<button class="save-btn" id="saveBtn">${btnLabel}</button>
+
+<div id="loadingBox">
+  <div class="ld-ring"></div>
+  <div class="ld-track"><div class="ld-bar" id="ldBar"></div></div>
+  <div class="ld-label">載 入 中 &nbsp;<span id="ldPct">0%</span></div>
+</div>
+
+<div class="media" id="mediaWrap">${mediaEl}</div>
+
+<button class="save-btn" id="saveBtn" style="display:none">${btnLabel}</button>
 <button class="open-safari" id="safariBtn">在 Safari 中開啟</button>
-<p class="hint" id="hint">${hintText}</p>
+<p class="hint" id="hint" style="display:none">${hintText}</p>
+
 <script>
 (function(){
   var PHOTO_URL = ${JSON.stringify(photoUrl)};
   var FILENAME  = ${JSON.stringify(filename)};
-  var isVideo   = ${isVideo};
-  var btn  = document.getElementById('saveBtn');
+  var IS_VIDEO  = ${isVideo};
+  var loadBox = document.getElementById('loadingBox');
+  var mediaWrap = document.getElementById('mediaWrap');
+  var saveBtn = document.getElementById('saveBtn');
   var hint = document.getElementById('hint');
   var safBtn = document.getElementById('safariBtn');
+  var ldBar = document.getElementById('ldBar');
+  var ldPct = document.getElementById('ldPct');
 
-  // Detect LINE / WeChat in-app browser
+  function showMedia() {
+    loadBox.style.display = 'none';
+    mediaWrap.classList.add('ready');
+    saveBtn.style.display = 'block';
+    hint.style.display = 'block';
+  }
+
+  function setProgress(pct) {
+    var p = Math.min(Math.round(pct), 100);
+    ldBar.style.width = p + '%';
+    ldPct.textContent = p + '%';
+  }
+
+  if (IS_VIDEO) {
+    var vid = document.getElementById('mainVideo');
+    // Track buffering progress
+    function onProgress() {
+      if (vid.buffered.length > 0 && vid.duration) {
+        setProgress(vid.buffered.end(vid.buffered.length - 1) / vid.duration * 100);
+      }
+    }
+    vid.addEventListener('progress', onProgress);
+    vid.addEventListener('timeupdate', onProgress);
+    vid.addEventListener('canplay', function onReady() {
+      vid.removeEventListener('canplay', onReady);
+      setProgress(100);
+      setTimeout(showMedia, 120);
+    });
+    vid.addEventListener('error', function() {
+      ldPct.textContent = '載入失敗';
+      loadBox.querySelector('.ld-ring').style.display = 'none';
+    });
+  } else {
+    var img = document.getElementById('mainImg');
+    img.addEventListener('load', function() {
+      setProgress(100);
+      setTimeout(showMedia, 80);
+    });
+    img.addEventListener('error', function() {
+      ldPct.textContent = '載入失敗';
+    });
+    // If already cached / fast load
+    if (img.complete && img.naturalWidth) { setProgress(100); showMedia(); }
+  }
+
+  // LINE / WeChat in-app browser
   var ua = navigator.userAgent || '';
   var inApp = /Line|MicroMessenger|FBAV|Instagram/.test(ua);
   if (inApp) {
     safBtn.style.display = 'block';
     hint.textContent = '請點「在 Safari 中開啟」後，再點「儲存影片」。';
   }
-  safBtn.addEventListener('click', function(){
-    window.open(location.href, '_blank');
-  });
+  safBtn.addEventListener('click', function(){ window.open(location.href, '_blank'); });
 
-  btn.addEventListener('click', async function(){
-    btn.disabled = true;
-    btn.textContent = '載入中...';
+  saveBtn.addEventListener('click', async function(){
+    saveBtn.disabled = true;
+    saveBtn.textContent = '載入中...';
     try {
       var res  = await fetch(PHOTO_URL);
       var blob = await res.blob();
-      var file = new File([blob], FILENAME, { type: 'video/mp4' });
+      var file = new File([blob], FILENAME, { type: IS_VIDEO ? 'video/mp4' : 'image/jpeg' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: '${safeName} 婚禮影片' });
       } else {
@@ -244,8 +323,8 @@ body{background:#1a0d10;color:#fff;font-family:-apple-system,"Helvetica Neue",sa
         safBtn.style.display = 'block';
       }
     }
-    btn.disabled = false;
-    btn.textContent = ${JSON.stringify(btnLabel)};
+    saveBtn.disabled = false;
+    saveBtn.textContent = ${JSON.stringify(btnLabel)};
   });
 })();
 </script>

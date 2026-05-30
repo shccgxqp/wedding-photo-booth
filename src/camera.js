@@ -1,42 +1,56 @@
 function clamp(v) { return Math.round(Math.max(0, Math.min(255, v))); }
 
-function applyPixelFilter(ctx, canvas, filterId) {
+// Pure pixel-level filter — no ctx.filter API, works on all browsers/iOS versions
+export function applyFilterToPixels(data, filterId) {
   if (!filterId || filterId === 'none') return;
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const d = imageData.data;
 
-  for (let i = 0; i < d.length; i += 4) {
-    const r = d[i], g = d[i + 1], b = d[i + 2];
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i], g = data[i + 1], b = data[i + 2];
 
     if (filterId === 'bw') {
       const v = clamp(0.299 * r + 0.587 * g + 0.114 * b);
-      d[i] = d[i + 1] = d[i + 2] = v;
-
-    } else if (filterId === 'warm') {
-      const sr = clamp(0.7572 * r + 0.3076 * g + 0.0756 * b);
-      const sg = clamp(0.1396 * r + 0.8744 * g + 0.0672 * b);
-      const sb = clamp(0.1088 * r + 0.2136 * g + 0.6524 * b);
-      const gray = 0.299 * sr + 0.587 * sg + 0.114 * sb;
-      d[i]     = clamp(gray + 1.4 * (sr - gray));
-      d[i + 1] = clamp(gray + 1.4 * (sg - gray));
-      d[i + 2] = clamp(gray + 1.4 * (sb - gray));
-
-    } else if (filterId === 'cool') {
-      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-      d[i]     = clamp(gray + 0.9 * (r - gray) - 8);
-      d[i + 1] = clamp(gray + 0.9 * (g - gray) + 5);
-      d[i + 2] = clamp(gray + 0.9 * (b - gray) + 20);
-
-    } else if (filterId === 'vintage') {
-      const sr = clamp(0.6358 * r + 0.4614 * g + 0.1134 * b);
-      const sg = clamp(0.2094 * r + 0.8116 * g + 0.1008 * b);
-      const sb = clamp(0.1632 * r + 0.3204 * g + 0.4786 * b);
-      d[i]     = clamp(0.9 * (0.9 * (sr - 128) + 128));
-      d[i + 1] = clamp(0.9 * (0.9 * (sg - 128) + 128));
-      d[i + 2] = clamp(0.9 * (0.9 * (sb - 128) + 128));
+      data[i] = data[i + 1] = data[i + 2] = v;
+      continue;
     }
+
+    if (filterId === 'natural') {
+      // brightness(1.06) contrast(0.9) saturate(0.95)
+      r = clamp(r * 1.06); g = clamp(g * 1.06); b = clamp(b * 1.06);
+      r = clamp((r - 128) * 0.9 + 128); g = clamp((g - 128) * 0.9 + 128); b = clamp((b - 128) * 0.9 + 128);
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      r = clamp(gray + 0.95 * (r - gray));
+      g = clamp(gray + 0.95 * (g - gray));
+      b = clamp(gray + 0.95 * (b - gray));
+    } else if (filterId === 'fresh') {
+      // brightness(1.12) contrast(0.86) saturate(0.8)
+      r = clamp(r * 1.12); g = clamp(g * 1.12); b = clamp(b * 1.12);
+      r = clamp((r - 128) * 0.86 + 128); g = clamp((g - 128) * 0.86 + 128); b = clamp((b - 128) * 0.86 + 128);
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      r = clamp(gray + 0.8 * (r - gray));
+      g = clamp(gray + 0.8 * (g - gray));
+      b = clamp(gray + 0.8 * (b - gray));
+    } else if (filterId === 'vintage') {
+      // brightness(0.9) contrast(1.24) saturate(1.19) sepia(1) grayscale(0.17)
+      r = clamp(r * 0.9); g = clamp(g * 0.9); b = clamp(b * 0.9);
+      r = clamp((r - 128) * 1.24 + 128); g = clamp((g - 128) * 1.24 + 128); b = clamp((b - 128) * 1.24 + 128);
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      r = clamp(gray + 1.19 * (r - gray));
+      g = clamp(gray + 1.19 * (g - gray));
+      b = clamp(gray + 1.19 * (b - gray));
+      // sepia(1) — full sepia matrix
+      const sr = clamp(0.393 * r + 0.769 * g + 0.189 * b);
+      const sg = clamp(0.349 * r + 0.686 * g + 0.168 * b);
+      const sb = clamp(0.272 * r + 0.534 * g + 0.131 * b);
+      r = sr; g = sg; b = sb;
+      // grayscale(0.17) — 17% blend toward luminance
+      const gray2 = 0.299 * r + 0.587 * g + 0.114 * b;
+      r = clamp(gray2 * 0.17 + r * 0.83);
+      g = clamp(gray2 * 0.17 + g * 0.83);
+      b = clamp(gray2 * 0.17 + b * 0.83);
+    }
+
+    data[i] = r; data[i + 1] = g; data[i + 2] = b;
   }
-  ctx.putImageData(imageData, 0, 0);
 }
 
 export function wait(ms) {
@@ -84,7 +98,7 @@ export async function runCountdown(seconds, onTick) {
   onTick(null);
 }
 
-export function captureFrame(videoEl, workCanvas, activeLayout, activeFilter) {
+export function captureFrame(videoEl, workCanvas, activeLayout, filterId) {
   const shotRatio = activeLayout?.shotRatio || '4/3';
   const [rw, rh] = shotRatio.split('/').map(Number);
   const captureW = rw >= rh ? 1200 : Math.round(1200 * rw / rh);
@@ -92,7 +106,6 @@ export function captureFrame(videoEl, workCanvas, activeLayout, activeFilter) {
 
   workCanvas.width = captureW;
   workCanvas.height = captureH;
-  const ctx = workCanvas.getContext('2d');
 
   const sw = videoEl.videoWidth;
   const sh = videoEl.videoHeight;
@@ -108,13 +121,18 @@ export function captureFrame(videoEl, workCanvas, activeLayout, activeFilter) {
     sy = (sh - cropH) / 2;
   }
 
+  const ctx = workCanvas.getContext('2d');
   ctx.save();
-  ctx.translate(workCanvas.width, 0);
+  ctx.translate(captureW, 0);
   ctx.scale(-1, 1);
-  ctx.drawImage(videoEl, sx, sy, cropW, cropH, 0, 0, workCanvas.width, workCanvas.height);
+  ctx.drawImage(videoEl, sx, sy, cropW, cropH, 0, 0, captureW, captureH);
   ctx.restore();
 
-  applyPixelFilter(ctx, workCanvas, activeFilter);
+  if (filterId && filterId !== 'none') {
+    const imageData = ctx.getImageData(0, 0, captureW, captureH);
+    applyFilterToPixels(imageData.data, filterId);
+    ctx.putImageData(imageData, 0, 0);
+  }
 
   return workCanvas.toDataURL('image/png');
 }

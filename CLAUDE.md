@@ -253,3 +253,72 @@ python -m playwright install chromium
 - 確認 `ffmpeg` 已安裝（`ffmpeg -version`）
 - 活動前清空 `uploads/`
 - 部署於 HTTPS（iPad／手機鏡頭存取必要）
+
+---
+
+## 伺服器部署指南
+
+### 為什麼 ffmpeg 是必要的
+
+影片模式流程：
+1. Client（瀏覽器）用 MediaRecorder 錄製，格式依裝置而異（Chrome → WebM、iOS → MP4）
+2. Server 接收後用 **ffmpeg** 統一轉為 H.264 MP4 + `-movflags +faststart`
+3. 若 ffmpeg 未安裝 → 轉檔跳過 → 存入原始 WebM 但副檔名為 .mp4 → **iOS Safari 無法播放**（容器格式不符）
+
+終端機錯誤訊息：`[video] ffmpeg conversion skipped: spawn ffmpeg ENOENT`
+
+### 本機開發（Windows）
+
+```bash
+winget install ffmpeg
+# 重新開終端機
+ffmpeg -version   # 確認有輸出版本號
+npm run dev
+```
+
+### 正式伺服器（Linux）
+
+```bash
+# Ubuntu / Debian
+apt update && apt install -y ffmpeg nodejs npm
+
+# 確認
+ffmpeg -version
+node -v
+```
+
+### 雲端平台部署方式
+
+| 平台 | 方式 | 備註 |
+|------|------|------|
+| **Ubuntu VPS**（Hetzner / DigitalOcean） | `apt install ffmpeg` | 最穩，推薦 |
+| **Railway** | `nixpacks.toml` 加 `ffmpeg` | 自動 build |
+| **Render** | Dockerfile `RUN apt-get install -y ffmpeg` | |
+| **Fly.io** | Dockerfile `RUN apt-get install -y ffmpeg` | |
+| **Vercel / Netlify** | ❌ 不支援 | 無法常駐 server process |
+
+### Railway 快速部署（nixpacks）
+
+在專案根目錄建立 `nixpacks.toml`：
+
+```toml
+[phases.setup]
+nixPkgs = ["nodejs_20", "ffmpeg"]
+
+[start]
+cmd = "node server.cjs"
+```
+
+環境變數設定（Railway dashboard）：
+```
+PUBLIC_BASE_URL=https://your-app.railway.app
+PORT=3000
+```
+
+### 部署後必做
+
+1. `ffmpeg -version` 確認安裝
+2. 設定 `PUBLIC_BASE_URL` 為 HTTPS 網域（QR Code 用）
+3. 清空 `uploads/` 目錄（或設定定期清理）
+4. 確認 `config/wedding.json` 的 `coupleName`、`weddingDate` 正確
+5. 測試影片模式：拍攝 → QR → 手機掃描 → 確認可播放

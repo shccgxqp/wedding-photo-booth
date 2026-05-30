@@ -4,6 +4,7 @@
   "tagline": "Wedding Photo Booth",
   "countdownSeconds": 3,
   "publicBaseUrl": "https://2kmrs0gg-3000.jpe1.devtunnels.ms/",
+  "gifMode": "test",
   "theme": {
     "primary": "#f28ca8",
     "secondary": "#fff4f7",

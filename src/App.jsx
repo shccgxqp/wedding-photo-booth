@@ -110,10 +110,12 @@ export default function App() {
       console.error('Video upload failed:', uploadErr);
       setResultData({ blobUrl, downloadUrl: null, filename: null, isVideo: true });
     }
+    setBusy(false);
     setScreen('result');
   }
 
   function handleGifTaken(result) {
+    setBusy(false);
     if (result.gifModes) {
       const best = result.gifModes.opt || result.gifModes.high || result.gifModes.med || result.gifModes.low;
       const modeCount = Object.keys(result.gifModes).length;
@@ -121,20 +123,24 @@ export default function App() {
         blobUrl: best?.downloadUrl || null,
         downloadUrl: best?.downloadUrl || null,
         filename: best?.filename || null,
-        // only pass gifModes to ResultScreen when comparing multiple variants
         gifModes: modeCount > 1 ? result.gifModes : undefined,
       });
-    } else {
+    } else if (result.downloadUrl) {
+      // handleGifCapture (non-HQ) path
       setResultData({
         blobUrl: result.downloadUrl,
         downloadUrl: result.downloadUrl,
         filename: result.filename,
       });
+    } else {
+      // composition failed — show result screen with error state
+      setResultData({ blobUrl: null, downloadUrl: null, filename: null });
     }
     setScreen('result');
   }
 
   function handleShootAgain() {
+    setBusy(false);
     setShots([]);
     setScreen('camera');
   }

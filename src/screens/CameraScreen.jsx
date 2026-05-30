@@ -328,12 +328,78 @@ export default function CameraScreen({ onAllShotsTaken, onGifTaken, onGifComposi
     };
   })();
 
+  const [captureMode, setCaptureMode] = useState('photo'); // 'photo' | 'video'
+
+  const handleShutter = captureMode === 'photo' ? handleCapture : handleVideoCapture;
+
   return (
     <section className="stage">
-      <div className="camera-panel">
-        <div className="camera-col">
-          <div className="camera-preview-wrap" ref={wrapRef}>
-            <div className="camera-preview" ref={previewRef}>
+      {/* Backgrounds */}
+      <div className="camera-screen-bg">
+        <div className="camera-screen-overlay" />
+      </div>
+
+      <div className="camera-shoot-wrap">
+
+        {/* Back button */}
+        <button
+          className="camera-back-btn"
+          type="button"
+          disabled={busy}
+          onClick={onBackToLayouts}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 5l-7 7 7 7" />
+          </svg>
+        </button>
+
+        {/* Header */}
+        <div className="camera-shoot-header">
+          <div className="camera-shot-title">
+            Photo <em>{nextShot}</em> of {required}
+          </div>
+          {/* Progress bars */}
+          <div className="camera-progress-bars">
+            {Array.from({ length: required }).map((_, i) => (
+              <div key={i} style={{
+                width: i + 1 === nextShot ? 38 : 20,
+                height: 5,
+                borderRadius: 999,
+                background: i + 1 < nextShot
+                  ? '#BD9A4E'
+                  : i + 1 === nextShot
+                    ? '#E4C97E'
+                    : 'rgba(228,201,126,0.26)',
+                transition: 'width 220ms ease, background 220ms ease',
+              }} />
+            ))}
+          </div>
+        </div>
+
+        {/* Camera frame card */}
+        <div className="camera-frame-card">
+          {/* Brass corners */}
+          {[
+            { top: 4, left: 4 },
+            { top: 4, right: 4, transform: 'scaleX(-1)' },
+            { bottom: 4, left: 4, transform: 'scaleY(-1)' },
+            { bottom: 4, right: 4, transform: 'scale(-1,-1)' },
+          ].map((s, i) => (
+            <div key={i} className="camera-brass-corner" style={s}>
+              <svg width="26" height="26" viewBox="0 0 30 30" fill="none">
+                <path d="M2 28 L2 8 Q 2 2 8 2 L 28 2" stroke="#BD9A4E" strokeWidth="1.4" fill="none" />
+              </svg>
+            </div>
+          ))}
+
+          {/* Camera preview area */}
+          <div className="camera-frame-inner" ref={wrapRef}>
+            <div
+              className="camera-preview"
+              ref={previewRef}
+              style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }}
+            >
               <video ref={videoRef} autoPlay playsInline muted />
               {heartGuideStyle && (
                 <div className="camera-heart-guide" style={heartGuideStyle} aria-hidden="true" />
@@ -343,61 +409,65 @@ export default function CameraScreen({ onAllShotsTaken, onGifTaken, onGifComposi
                   {isSmile ? 'smile' : isRec ? '●REC' : countdown}
                 </div>
               )}
-              <div className="shot-badge">{nextShot} / {required}</div>
               <div className="flash-overlay" ref={flashRef} />
             </div>
+
+            {/* Viewfinder corners */}
+            <div className="camera-viewfinder-corner" style={{ top: 14, left: 14, borderTopWidth: 2, borderLeftWidth: 2 }} />
+            <div className="camera-viewfinder-corner" style={{ top: 14, right: 14, borderTopWidth: 2, borderRightWidth: 2 }} />
+            <div className="camera-viewfinder-corner" style={{ bottom: 14, left: 14, borderBottomWidth: 2, borderLeftWidth: 2 }} />
+            <div className="camera-viewfinder-corner" style={{ bottom: 14, right: 14, borderBottomWidth: 2, borderRightWidth: 2 }} />
+
           </div>
-          <div className="filter-bar">
-            {filters.map((filter) => (
+        </div>
+
+        {/* Filter pills */}
+        <div className="camera-filter-row">
+          {filters.map((filter) => (
+            <button
+              key={filter.id}
+              className={`filter-pill${activeFilter === filter.id ? ' active' : ''}`}
+              type="button"
+              onClick={() => setActiveFilter(filter.id)}
+            >
+              {filter.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Mode toggle + shutter */}
+        <div className="camera-controls">
+          <div className="camera-mode-toggle">
+            {[{ id: 'photo', label: '拍 照' }, { id: 'video', label: '影 片' }].map((m) => (
               <button
-                key={filter.id}
-                className={`filter-pill${activeFilter === filter.id ? ' active' : ''}`}
+                key={m.id}
                 type="button"
-                onClick={() => setActiveFilter(filter.id)}
+                className={`camera-mode-btn${captureMode === m.id ? ' active' : ''}`}
+                onClick={() => setCaptureMode(m.id)}
+                disabled={busy}
               >
-                {filter.name}
+                {m.label}
               </button>
             ))}
           </div>
+
+          <button
+            className="camera-shutter-btn"
+            type="button"
+            disabled={busy}
+            onClick={handleShutter}
+          >
+            {captureMode === 'video' ? (
+              <span style={{ width: 40, height: 40, borderRadius: 10, background: '#E0584B', display: 'block' }} />
+            ) : (
+              <span style={{
+                width: 86, height: 86, borderRadius: '50%', display: 'block',
+                background: 'linear-gradient(180deg, #fdf6e8, #F4EAD6)',
+              }} />
+            )}
+          </button>
         </div>
-        <aside className="side-panel">
-          <span className="tiny-label">{activeLayout.name}</span>
-          <h2>準備拍攝</h2>
-          <p className="status-text">{status}</p>
-          <button
-            className="ghost-btn"
-            type="button"
-            disabled={busy}
-            onClick={config.gifMode === 'test' ? handleGifCaptureHQ : handleGifCapture}
-          >
-            {config.gifMode === 'test' ? '拍攝動動照片（品質測試）' : '拍攝動動照片'}
-          </button>
-          <button
-            className="ghost-btn"
-            type="button"
-            disabled={busy}
-            onClick={handleVideoCapture}
-            title={isIgCompatible(getBestVideoMime()) ? 'MP4 — 可直接上傳 IG 限動' : 'WebM — 需轉檔才能上傳 IG'}
-          >
-            拍攝影片 {isIgCompatible(getBestVideoMime()) ? '🎬' : '🎬⚠️'}
-          </button>
-          <button
-            className="primary-btn"
-            type="button"
-            disabled={busy}
-            onClick={handleCapture}
-          >
-            開始拍攝
-          </button>
-          <button
-            className="ghost-btn"
-            type="button"
-            disabled={busy}
-            onClick={onBackToLayouts}
-          >
-            回版型選擇
-          </button>
-        </aside>
+
       </div>
     </section>
   );
